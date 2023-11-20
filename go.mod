@@ -1,4 +1,4 @@
-module github.com/sknr/webhookbot
+module github.com/sknr/webhook-to-telegram
 
 go 1.21.4
 

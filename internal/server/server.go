@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/NicoNex/echotron/v3"
-	"github.com/sknr/webhookbot/internal/telegram"
+	"github.com/sknr/webhook-to-telegram/internal/telegram"
 	"gopkg.in/yaml.v3"
 	"io"
 	"log"

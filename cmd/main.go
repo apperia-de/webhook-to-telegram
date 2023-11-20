@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"github.com/joho/godotenv"
-	"github.com/sknr/webhookbot/internal/server"
+	"github.com/sknr/webhook-to-telegram/internal/server"
 	"log"
 	"os"
 	"os/signal"
