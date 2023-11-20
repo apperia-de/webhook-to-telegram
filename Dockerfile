@@ -11,7 +11,7 @@ WORKDIR /app
 # https://docs.docker.com/engine/reference/builder/#copy
 COPY . ./
 # Build
-RUN CGO_ENABLED=0 GOOS=linux go build -o /telegram_gp101bot cmd/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o /wh2t cmd/main.go
 
 # Deploy the application binary into a lean image
 #FROM gcr.io/distroless/base-debian12 AS build-release-stage
@@ -19,7 +19,7 @@ FROM gcr.io/distroless/static-debian12 AS build-release-stage
 
 WORKDIR /
 
-COPY --from=build-stage /telegram_gp101bot /app/.env ./
+COPY --from=build-stage /wh2t /app/.env ./
 
 USER nonroot:nonroot
 
@@ -31,4 +31,4 @@ USER nonroot:nonroot
 EXPOSE 8080
 
 # Run
-CMD ["/telegram_gp101bot"]
+CMD ["/wh2t"]
