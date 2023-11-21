@@ -123,7 +123,11 @@ func (s *WebhookServer) createWebhookHandlers(webhooks []WebhookConfig) {
 
 			for _, key := range wh.MessageKeys {
 				if val, ok := msg[key]; ok {
-					values = append(values, val.(string))
+					if val == nil {
+						values = append(values, "")
+						continue
+					}
+					values = append(values, val)
 				}
 			}
 
