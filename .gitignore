@@ -1,7 +1,7 @@
 .idea/
 .env
 *.tgz
-webhooks.yml
+config.yml
 docker-compose.yml
 compose-dev.yml
 Makefile

@@ -19,7 +19,7 @@ func main() {
 	termChan := make(chan os.Signal, 1) // Channel for terminating the app via os.Interrupt signal
 	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
 
-	s := server.New(os.Getenv("BOT_TOKEN"))
+	s := server.New()
 	go func() {
 		<-termChan
 		// Perform some cleanup...

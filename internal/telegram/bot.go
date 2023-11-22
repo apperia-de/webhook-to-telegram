@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/NicoNex/echotron/v3"
 	"github.com/joho/godotenv"
-	"os"
 )
 
 func init() {
@@ -14,10 +13,18 @@ func init() {
 	}
 }
 
-func NewBot(chatID int64) echotron.Bot {
+type Telegram struct {
+	botToken string
+}
+
+func New(botToken string) *Telegram {
+	return &Telegram{botToken}
+}
+
+func (t *Telegram) NewBot(chatID int64) echotron.Bot {
 	return &bot{
 		chatID,
-		echotron.NewAPI(os.Getenv("BOT_TOKEN")),
+		echotron.NewAPI(t.botToken),
 	}
 }
 
