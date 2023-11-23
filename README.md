@@ -5,16 +5,16 @@
 ![GitHub Licence](https://img.shields.io/github/license/sknr/webhook-to-telegram)
 
 A Telegram bot which may handle webhook updates from several 
-services like GitHub, Kofi, PayPal, etc.
+services like GitHub, Kofi, PayPal, etc. and sends them as Telegram messages.
 
 ## Required steps
 
 1. Create a Telegram bot via [BotFather](https://t.me/botfather) and obtain a bot token.
 2. Edit your `.env` file or your env vars directly and set both `BOT_TOKEN` and `TELEGRAM_WEBHOOK_URL` accordingly.
-3. Copy or rename `webhooks_example.yml` to `webhooks.yml` and configure to your desired webhook service needs. (See ko-fi.com example)
+3. Copy or rename `config_example.yml` to `config.yml` and configure to your desired webhook service needs. (see example below)
 4. Build cmd/main.go via `go build main.go -o wh2t` and run the Telegram bot server.
 
-## Example: webhooks.yml
+## Example: config.yml
 
 In order to turn json data send via webhook to your Telegram bot into a message send to your Telegram account, you need to configure each service accordingly.
 
@@ -78,7 +78,7 @@ webhooks:
 ```
 
 ## General considerations
-Since there exists no "Webhook" standard yet and because I build this little project for myself and the only webhook I currently use is the one from ko-fi.com, 
+Since there exists no "Webhook" standard yet and because I build this little project for myself and the only webhooks I currently use are the one from ko-fi.com and github.com, 
 probably not all available use cases for webhook messages will be supported "out-of-the-box". If you have a special case or need any help, create an issue and I try to help. 
 If you would like to contribute, I'll be happy to review your PR.
 
