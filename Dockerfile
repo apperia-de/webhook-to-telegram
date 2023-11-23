@@ -19,7 +19,7 @@ FROM gcr.io/distroless/static-debian12 AS build-release-stage
 
 WORKDIR /
 
-COPY --from=build-stage /app/wh2t /app/.env /app/config.yml ./
+COPY --from=build-stage /app/wh2t /app/config.yml ./
 
 USER nonroot:nonroot
 

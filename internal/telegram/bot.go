@@ -3,15 +3,7 @@ package telegram
 import (
 	"fmt"
 	"github.com/NicoNex/echotron/v3"
-	"github.com/joho/godotenv"
 )
-
-func init() {
-	err := godotenv.Load()
-	if err != nil {
-		panic(err)
-	}
-}
 
 type Telegram struct {
 	botToken string
