@@ -86,9 +86,9 @@ func (s *WebhookServer) GetHttpServer() *http.Server {
 
 func (s *WebhookServer) Start() {
 	t := telegram.New(s.config.Telegram.BotToken)
-	dsp := echotron.NewDispatcher(os.Getenv("BOT_TOKEN"), t.NewBot)
+	dsp := echotron.NewDispatcher(s.config.Telegram.BotToken, t.NewBot)
 	dsp.SetHTTPServer(s.GetHttpServer())
-	log.Println(dsp.ListenWebhook(os.Getenv("TELEGRAM_WEBHOOK_URL")))
+	log.Println(dsp.ListenWebhook(s.config.Telegram.WebhookURL))
 }
 
 func (s *WebhookServer) initialize() {
