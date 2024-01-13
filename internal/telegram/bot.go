@@ -27,6 +27,10 @@ type bot struct {
 
 func (b *bot) Update(update *echotron.Update) {
 	// Currently the only command we serve is the /id in order to show the users their own chatID.
+	if update.Message == nil {
+		return
+	}
+
 	if update.Message.Text == "/id" {
 		_, _ = b.SendMessage(fmt.Sprintf("Your ChatID is: %d", b.chatID), b.chatID, nil)
 	}
