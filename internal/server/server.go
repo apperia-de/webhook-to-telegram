@@ -32,13 +32,14 @@ type Config struct {
 }
 
 type Webhook struct {
-	Name           string         `yaml:"name"`
-	Pattern        string         `yaml:"pattern"`
-	ContentType    string         `yaml:"contentType"`
-	FormKey        string         `yaml:"formKey"`
-	TelegramChatID *int64         `yaml:"telegramChatID,omitempty"`
-	Verification   ValidationType `yaml:"verification"`
-	Templates      []*Template    `yaml:"templates,omitempty"`
+	Name           string             `yaml:"name"`
+	Pattern        string             `yaml:"pattern"`
+	ContentType    string             `yaml:"contentType"`
+	FormKey        string             `yaml:"formKey"`
+	ParseMode      echotron.ParseMode `yaml:"parseMode"`
+	TelegramChatID *int64             `yaml:"telegramChatID,omitempty"`
+	Verification   ValidationType     `yaml:"verification"`
+	Templates      []*Template        `yaml:"templates,omitempty"`
 }
 
 type Telegram struct {
@@ -48,12 +49,18 @@ type Telegram struct {
 }
 
 type Template struct {
-	Template string          `yaml:"template"`
-	Keys     []string        `yaml:"keys"`
-	Trigger  *ValidationType `yaml:"trigger,omitempty"`
+	Template string       `yaml:"template"`
+	Keys     []string     `yaml:"keys"`
+	Trigger  *TriggerType `yaml:"trigger,omitempty"`
 }
 
 type ValidationType struct {
+	Type  string `yaml:"type"` // Either header or message
+	Key   string `yaml:"key"`
+	Value string `yaml:"value"`
+}
+
+type TriggerType struct {
 	Type  string `yaml:"type"` // Either header or message
 	Key   string `yaml:"key"`
 	Value string `yaml:"value"`
@@ -205,7 +212,26 @@ func (s *WebhookServer) createWebhookHandlers(webhooks []*Webhook) {
 			text := fmt.Sprintf(t.Template, values...)
 
 			api := echotron.NewAPI(s.config.Telegram.BotToken)
-			_, err = api.SendMessage(text, s.getChatID(wh), nil)
+
+			if wh.ParseMode != "" {
+				log.Println("send message in parseMode: ", wh.ParseMode)
+			}
+			switch wh.ParseMode {
+			case echotron.HTML:
+				_, err = api.SendMessage(s.escapeText(echotron.HTML, text), s.getChatID(wh), &echotron.MessageOptions{
+					ParseMode: echotron.HTML,
+				})
+			case echotron.Markdown:
+				_, err = api.SendMessage(s.escapeText(echotron.Markdown, text), s.getChatID(wh), &echotron.MessageOptions{
+					ParseMode: echotron.Markdown,
+				})
+			case echotron.MarkdownV2:
+				_, err = api.SendMessage(s.escapeText(echotron.MarkdownV2, text), s.getChatID(wh), &echotron.MessageOptions{
+					ParseMode: echotron.MarkdownV2,
+				})
+			default:
+				_, err = api.SendMessage(text, s.getChatID(wh), nil)
+			}
 
 			if err != nil {
 				log.Println("cannot send telegram message:", err)
@@ -302,4 +328,32 @@ func (s *WebhookServer) getChatID(wh *Webhook) int64 {
 		return *s.config.Telegram.ChatID
 	}
 	return *wh.TelegramChatID
+}
+
+// EscapeText takes an input text and escape Telegram markup symbols.
+// In this way we can send a text without being afraid of having to escape the characters manually.
+// Note that you don't have to include the formatting style in the input text, or it will be escaped too.
+// If there is an error, an empty string will be returned.
+//
+// parseMode is the text formatting mode (ModeMarkdown, ModeMarkdownV2 or ModeHTML)
+// text is the input string that will be escaped
+func (s *WebhookServer) escapeText(parseMode echotron.ParseMode, text string) string {
+	var replacer *strings.Replacer
+
+	switch parseMode {
+	case echotron.HTML:
+		replacer = strings.NewReplacer("<", "&lt;", ">", "&gt;", "&", "&amp;")
+	case echotron.Markdown:
+		replacer = strings.NewReplacer("_", "\\_", "*", "\\*", "`", "\\`", "[", "\\[")
+	case echotron.MarkdownV2:
+		replacer = strings.NewReplacer("_", "\\_", "*", "\\*", "[", "\\[", "]", "\\]", "(",
+			"\\(", ")", "\\)", "~", "\\~", "`", "\\`", ">", "\\>",
+			"#", "\\#", "+", "\\+", "-", "\\-", "=", "\\=", "|",
+			"\\|", "{", "\\{", "}", "\\}", ".", "\\.", "!", "\\!",
+		)
+	default:
+		return ""
+	}
+
+	return replacer.Replace(text)
 }
