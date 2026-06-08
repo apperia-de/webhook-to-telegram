@@ -1,6 +1,6 @@
 /*
  * Echotron
- * Copyright (C) 2022 The Echotron Devs
+ * Copyright (C) 2022 The Echotron Contributors
  *
  * Echotron is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -20,21 +20,22 @@ package echotron
 
 // ChatAdministratorRights represents the rights of an administrator in a chat.
 type ChatAdministratorRights struct {
-	IsAnonymous          bool `json:"is_anonymous"`
-	CanManageChat        bool `json:"can_manage_chat"`
-	CanDeleteMessages    bool `json:"can_delete_messages"`
-	CanManageVideo_chats bool `json:"can_manage_video_chats"`
-	CanRestrictMembers   bool `json:"can_restrict_members"`
-	CanPromoteMembers    bool `json:"can_promote_members"`
-	CanChangeInfo        bool `json:"can_change_info"`
-	CanInviteUsers       bool `json:"can_invite_users"`
-	CanPostMessages      bool `json:"can_post_messages,omitempty"`
-	CanEditMessages      bool `json:"can_edit_messages,omitempty"`
-	CanPinMessages       bool `json:"can_pin_messages,omitempty"`
-	CanPostStories       bool `json:"can_post_stories,omitempty"`
-	CanEditStories       bool `json:"can_edit_stories,omitempty"`
-	CanDeleteStories     bool `json:"can_delete_stories,omitempty"`
-	CanManageTopics      bool `json:"can_manage_topics,omitempty"`
+	IsAnonymous             bool `json:"is_anonymous"`
+	CanManageChat           bool `json:"can_manage_chat"`
+	CanDeleteMessages       bool `json:"can_delete_messages"`
+	CanManageVideoChats     bool `json:"can_manage_video_chats"`
+	CanRestrictMembers      bool `json:"can_restrict_members"`
+	CanPromoteMembers       bool `json:"can_promote_members"`
+	CanChangeInfo           bool `json:"can_change_info"`
+	CanInviteUsers          bool `json:"can_invite_users"`
+	CanPostStories          bool `json:"can_post_stories"`
+	CanEditStories          bool `json:"can_edit_stories"`
+	CanDeleteStories        bool `json:"can_delete_stories"`
+	CanPostMessages         bool `json:"can_post_messages,omitempty"`
+	CanEditMessages         bool `json:"can_edit_messages,omitempty"`
+	CanPinMessages          bool `json:"can_pin_messages,omitempty"`
+	CanManageTopics         bool `json:"can_manage_topics,omitempty"`
+	CanManageDirectMessages bool `json:"can_manage_direct_messages,omitempty"`
 }
 
 // SetMyDefaultAdministratorRightsOptions contains the optional parameters used by
@@ -54,11 +55,11 @@ type GetMyDefaultAdministratorRightsOptions struct {
 // requested by the bot when it's added as an administrator to groups or channels.
 // These rights will be suggested to users, but they are are free to modify the list
 // before adding the bot.
-func (a API) SetMyDefaultAdministratorRights(opts SetMyDefaultAdministratorRightsOptions) (res APIResponseBool, err error) {
-	return get[APIResponseBool](a.base, "setMyDefaultAdministratorRights", urlValues(opts))
+func (a API) SetMyDefaultAdministratorRights(opts *SetMyDefaultAdministratorRightsOptions) (res APIResponseBool, err error) {
+	return res, a.lclient.get(a.base, "setMyDefaultAdministratorRights", urlValues(opts), &res)
 }
 
 // GetMyDefaultAdministratorRights is used to get the current default administrator rights of the bot.
-func (a API) GetMyDefaultAdministratorRights(opts GetMyDefaultAdministratorRightsOptions) (res APIResponseChatAdministratorRights, err error) {
-	return get[APIResponseChatAdministratorRights](a.base, "getMyDefaultAdministratorRights", urlValues(opts))
+func (a API) GetMyDefaultAdministratorRights(opts *GetMyDefaultAdministratorRightsOptions) (res APIResponseChatAdministratorRights, err error) {
+	return res, a.lclient.get(a.base, "getMyDefaultAdministratorRights", urlValues(opts), &res)
 }

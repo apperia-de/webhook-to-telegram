@@ -1,6 +1,6 @@
 /*
  * Echotron
- * Copyright (C) 2018-2022 The Echotron Devs
+ * Copyright (C) 2018 The Echotron Contributors
  *
  * Echotron is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -68,13 +68,25 @@ type OrderInfo struct {
 
 // SuccessfulPayment contains basic information about a successful payment.
 type SuccessfulPayment struct {
-	OrderInfo               OrderInfo `json:"order_info"`
-	Currency                string    `json:"currency"`
-	InvoicePayload          string    `json:"invoice_payload"`
-	ShippingOptionID        string    `json:"shipping_option_id"`
-	TelegramPaymentChargeID string    `json:"telegram_payment_charge_id"`
-	ProviderPaymentChargeID string    `json:"provider_payment_charge_id"`
-	TotalAmount             int       `json:"total_amount"`
+	OrderInfo                  OrderInfo `json:"order_info"`
+	Currency                   string    `json:"currency"`
+	InvoicePayload             string    `json:"invoice_payload"`
+	ShippingOptionID           string    `json:"shipping_option_id"`
+	TelegramPaymentChargeID    string    `json:"telegram_payment_charge_id"`
+	ProviderPaymentChargeID    string    `json:"provider_payment_charge_id"`
+	TotalAmount                int       `json:"total_amount"`
+	SubscriptionExpirationDate int       `json:"subscription_expiration_date,omitempty"`
+	IsRecurring                bool      `json:"is_recurring,omitempty"`
+	IsFirstRecurring           bool      `json:"is_first_recurring,omitempty"`
+}
+
+// RefundedPayment contains basic information about a refunded payment.
+type RefundedPayment struct {
+	Currency                string `json:"currency"`
+	InvoicePayload          string `json:"invoice_payload"`
+	TelegramPaymentChargeID string `json:"telegram_payment_charge_id"`
+	ProviderPaymentChargeID string `json:"provider_payment_charge_id,omitempty"`
+	TotalAmount             int    `json:"total_amount"`
 }
 
 // ShippingQuery contains information about an incoming shipping query.
@@ -96,8 +108,152 @@ type PreCheckoutQuery struct {
 	TotalAmount      int       `json:"total_amount"`
 }
 
+// PaidMediaPurchased contains information about a paid media purchase.
+type PaidMediaPurchased struct {
+	PaidMediaPayload string `json:"paid_media_payload"`
+	From             User   `json:"from"`
+}
+
+// RevenueWithdrawalState describes the state of a revenue withdrawal operation.
+type RevenueWithdrawalState interface {
+	ImplementsRevenueWithdrawalState()
+}
+
+// RevenueWithdrawalStatePending describes the state of a withdrawal in progress.
+type RevenueWithdrawalStatePending struct {
+	Type string `json:"type"`
+}
+
+// ImplementsRevenueWithdrawalState is used to implement the RevenueWithdrawalState interface.
+func (r RevenueWithdrawalStatePending) ImplementsRevenueWithdrawalState() {}
+
+// RevenueWithdrawalStateSucceeded describes the state of a succeeded withdrawal.
+type RevenueWithdrawalStateSucceeded struct {
+	Type string `json:"type"`
+	URL  string `json:"url"`
+	Date int    `json:"date"`
+}
+
+// ImplementsRevenueWithdrawalState is used to implement the RevenueWithdrawalState interface.
+func (r RevenueWithdrawalStateSucceeded) ImplementsRevenueWithdrawalState() {}
+
+// RevenueWithdrawalStateFailed describes the state of a failed withdrawal, in which the transaction was refunded.
+type RevenueWithdrawalStateFailed struct {
+	Type string `json:"type"`
+}
+
+// ImplementsRevenueWithdrawalState is used to implement the RevenueWithdrawalState interface.
+func (r RevenueWithdrawalStateFailed) ImplementsRevenueWithdrawalState() {}
+
+// AffiliateInfo
+type AffiliateInfo struct {
+	AffiliateUser      *User `json:"affiliate_user,omitempty"`
+	AffiliateChat      *Chat `json:"affiliate_chat,omitempty"`
+	CommissionPerMille int   `json:"commission_per_mille"`
+	Amount             int   `json:"amount"`
+	NanostarAmount     int   `json:"nanostar_amount,omitempty"`
+}
+
+// TransactionPartner describes the source of a transaction, or its recipient for outgoing transactions.
+type TransactionPartner interface {
+	ImplementsTransactionPartner()
+}
+
+// TransactionPartnerAffiliateProgram describes the affiliate program that issued the affiliate commission received via this transaction.
+// Type MUST be "affiliate_program".
+type TransactionPartnerAffiliateProgram struct {
+	SponsorUser        *User  `json:"sponsor_user,omitempty"`
+	Type               string `json:"type"`
+	CommissionPerMille int    `json:"commission_per_mille,omitempty"`
+}
+
+// ImplementsTransactionPartner is used to implement the TransactionPartner interface.
+func (t TransactionPartnerAffiliateProgram) ImplementsTransactionPartner() {}
+
+// TransactionPartnerFragment describes a withdrawal transaction with Fragment.
+// Type MUST be "fragment".
+type TransactionPartnerFragment struct {
+	WithdrawalState RevenueWithdrawalState `json:"withdrawal_state"`
+	Type            string                 `json:"type"`
+}
+
+// ImplementsTransactionPartner is used to implement the TransactionPartner interface.
+func (t TransactionPartnerFragment) ImplementsTransactionPartner() {}
+
+// TransactionPartnerUser describes a transaction with a user.
+// Type MUST be "user".
+type TransactionPartnerUser struct {
+	Gift               Gift           `json:"gift,omitempty"`
+	PaidMedia          *[]PaidMedia   `json:"paid_media,omitempty"`
+	Affiliate          *AffiliateInfo `json:"affiliate,omitempty"`
+	Type               string         `json:"type"`
+	InvoicePayload     string         `json:"invoice_payload,omitempty"`
+	PaidMediaPayload   string         `json:"paid_media_payload,omitempty"`
+	User               User           `json:"user"`
+	SubscriptionPeriod int            `json:"subscription_period,omitempty"`
+}
+
+// TransactionPartnerChat describes a transaction with a chat.
+type TransactionPartnerChat struct {
+	Gift Gift   `json:"gift,omitempty"`
+	Type string `json:"type"`
+	Chat Chat   `json:"chat"`
+}
+
+// ImplementsTransactionPartner is used to implement the TransactionPartner interface.
+func (t TransactionPartnerUser) ImplementsTransactionPartner() {}
+
+// TransactionPartnerTelegramAds describes a withdrawal transaction to the Telegram Ads platform.
+// Type MUST be "telegram_ads".
+type TransactionPartnerTelegramAds struct {
+	Type string `json:"type"`
+}
+
+// ImplementsTransactionPartner is used to implement the TransactionPartner interface.
+func (t TransactionPartnerTelegramAds) ImplementsTransactionPartner() {}
+
+// TransactionPartnerTelegramApi describes a transaction with payment for paid broadcasting.
+// Type MUST be "telegram_api".
+type TransactionPartnerTelegramApi struct {
+	Type         string `json:"type"`
+	RequestCount int    `json:"request_count"`
+}
+
+// ImplementsTransactionPartner is used to implement the TransactionPartner interface.
+func (t TransactionPartnerTelegramApi) ImplementsTransactionPartner() {}
+
+// TransactionPartnerOther describes a transaction with an unknown source or recipient.
+// Type MUST be "other".
+type TransactionPartnerOther struct {
+	Type string `json:"type"`
+}
+
+// ImplementsTransactionPartner is used to implement the TransactionPartner interface.
+func (t TransactionPartnerOther) ImplementsTransactionPartner() {}
+
+// StarTransaction describes a Telegram Star transaction.
+type StarTransaction struct {
+	Source         TransactionPartner `json:"source"`
+	Receiver       TransactionPartner `json:"receiver"`
+	ID             string             `json:"id"`
+	Amount         int                `json:"amount"`
+	NanostarAmount int                `json:"nanostar_amount,omitempty"`
+	Date           int                `json:"date"`
+}
+
+// StarTransactions contains a list of Telegram Star transactions.
+type StarTransactions struct {
+	Transaction []StarTransaction `json:"transaction"`
+}
+
+// StarTransactionsOptions contains the optional parameters used by the GetStarTransactions method.
+type StarTransactionsOptions struct {
+	Offset int `query:"offset"`
+	Limit  int `query:"limit"`
+}
+
 // SendInvoice is used to send invoices.
-func (a API) SendInvoice(chatID int64, title, description, payload, providerToken, currency string, prices []LabeledPrice, opts *InvoiceOptions) (res APIResponseMessage, err error) {
+func (a API) SendInvoice(chatID int64, title, description, payload, currency string, prices []LabeledPrice, opts *InvoiceOptions) (res APIResponseMessage, err error) {
 	var vals = make(url.Values)
 
 	p, err := json.Marshal(prices)
@@ -109,10 +265,26 @@ func (a API) SendInvoice(chatID int64, title, description, payload, providerToke
 	vals.Set("title", title)
 	vals.Set("description", description)
 	vals.Set("payload", payload)
-	vals.Set("provider_token", providerToken)
 	vals.Set("currency", currency)
 	vals.Set("prices", string(p))
-	return get[APIResponseMessage](a.base, "sendInvoice", addValues(vals, opts))
+	return res, a.lclient.get(a.base, "sendInvoice", addValues(vals, opts), &res)
+}
+
+// CreateInvoiceLink creates a link for an invoice.
+func (a API) CreateInvoiceLink(title, description, payload, currency string, prices []LabeledPrice, opts *CreateInvoiceLinkOptions) (res APIResponseBase, err error) {
+	var vals = make(url.Values)
+
+	p, err := json.Marshal(prices)
+	if err != nil {
+		return res, err
+	}
+
+	vals.Set("title", title)
+	vals.Set("description", description)
+	vals.Set("payload", payload)
+	vals.Set("currency", currency)
+	vals.Set("prices", string(p))
+	return res, a.lclient.get(a.base, "createInvoiceLink", addValues(vals, opts), &res)
 }
 
 // AnswerShippingQuery is used to reply to shipping queries.
@@ -123,7 +295,7 @@ func (a API) AnswerShippingQuery(shippingQueryID string, ok bool, opts *Shipping
 
 	vals.Set("shipping_query_id", shippingQueryID)
 	vals.Set("ok", btoa(ok))
-	return get[APIResponseBase](a.base, "answerShippingQuery", addValues(vals, opts))
+	return res, a.lclient.get(a.base, "answerShippingQuery", addValues(vals, opts), &res)
 }
 
 // AnswerPreCheckoutQuery is used to respond to such pre-checkout queries.
@@ -135,23 +307,29 @@ func (a API) AnswerPreCheckoutQuery(preCheckoutQueryID string, ok bool, opts *Pr
 
 	vals.Set("pre_checkout_query_id", preCheckoutQueryID)
 	vals.Set("ok", btoa(ok))
-	return get[APIResponseBase](a.base, "answerPreCheckoutQuery", addValues(vals, opts))
+	return res, a.lclient.get(a.base, "answerPreCheckoutQuery", addValues(vals, opts), &res)
 }
 
-// CreateInvoiceLink creates a link for an invoice.
-func (a API) CreateInvoiceLink(title, description, payload, providerToken, currency string, prices []LabeledPrice, opts *CreateInvoiceLinkOptions) (res APIResponseBase, err error) {
+// GetStarTransactions returns the bot's Telegram Star transactions in chronological order.
+func (a API) GetStarTransactions(opts *StarTransactionsOptions) (res APIResponseStarTransactions, err error) {
+	return res, a.lclient.get(a.base, "getStarTransactions", urlValues(opts), &res)
+}
+
+// RefundStarPayment refunds a successful payment in Telegram Stars.
+func (a API) RefundStarPayment(userID int64, telegramPaymentChargeID string) (res APIResponseBool, err error) {
 	var vals = make(url.Values)
 
-	p, err := json.Marshal(prices)
-	if err != nil {
-		return res, err
-	}
+	vals.Set("user_id", itoa(userID))
+	vals.Set("telegram_payment_charge_id", telegramPaymentChargeID)
+	return res, a.lclient.get(a.base, "refundStarPayment", vals, &res)
+}
 
-	vals.Set("title", title)
-	vals.Set("description", description)
-	vals.Set("payload", payload)
-	vals.Set("provider_token", providerToken)
-	vals.Set("currency", currency)
-	vals.Set("prices", string(p))
-	return get[APIResponseBase](a.base, "createInvoiceLink", addValues(vals, opts))
+// EditUserStarSubscription allows the bot to cancel or re-enable extension of a subscription paid in Telegram Stars.
+func (a API) EditUserStarSubscription(userID int64, telegramPaymentChargeID string, isCanceled bool) (res APIResponseBool, err error) {
+	var vals = make(url.Values)
+
+	vals.Set("user_id", itoa(userID))
+	vals.Set("telegram_payment_charge_id", telegramPaymentChargeID)
+	vals.Set("is_canceled", btoa(isCanceled))
+	return res, a.lclient.get(a.base, "editUserStarSubscription", vals, &res)
 }

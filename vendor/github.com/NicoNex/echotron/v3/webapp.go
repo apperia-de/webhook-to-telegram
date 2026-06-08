@@ -1,6 +1,6 @@
 /*
  * Echotron
- * Copyright (C) 2022 The Echotron Devs
+ * Copyright (C) 2022 The Echotron Contributors
  *
  * Echotron is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -53,5 +53,5 @@ func (a API) AnswerWebAppQuery(webAppQueryID string, result InlineQueryResult) (
 
 	vals.Set("web_app_query_id", webAppQueryID)
 	vals.Set("result", string(resultJson))
-	return get[APIResponseSentWebAppMessage](a.base, "answerWebAppQuery", vals)
+	return res, a.lclient.get(a.base, "answerWebAppQuery", vals, &res)
 }

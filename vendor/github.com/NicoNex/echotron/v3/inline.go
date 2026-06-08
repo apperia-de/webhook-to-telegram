@@ -1,6 +1,6 @@
 /*
  * Echotron
- * Copyright (C) 2018-2022 The Echotron Devs
+ * Copyright (C) 2018 The Echotron Contributors
  *
  * Echotron is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published by
@@ -80,7 +80,6 @@ type InlineQueryResultArticle struct {
 	URL                 string              `json:"url,omitempty"`
 	ThumbnailWidth      int                 `json:"thumbnail_width,omitempty"`
 	ThumbnailHeight     int                 `json:"thumbnail_height,omitempty"`
-	HideURL             bool                `json:"hide_url,omitempty"`
 }
 
 // ImplementsInlineQueryResult is used to implement the InlineQueryResult interface.
@@ -90,19 +89,20 @@ func (i InlineQueryResultArticle) ImplementsInlineQueryResult() {}
 // By default, this photo will be sent by the user with optional caption.
 // Alternatively, you can use InputMessageContent to send a message with the specified content instead of the photo.
 type InlineQueryResultPhoto struct {
-	ReplyMarkup         ReplyMarkup         `json:"reply_markup,omitempty"`
-	InputMessageContent InputMessageContent `json:"input_message_content,omitempty"`
-	Title               string              `json:"title,omitempty"`
-	ThumbnailURL        string              `json:"thumbnail_url"`
-	PhotoURL            string              `json:"photo_url"`
-	ParseMode           string              `json:"parse_mode,omitempty"`
-	ID                  string              `json:"id"`
-	Description         string              `json:"description,omitempty"`
-	Caption             string              `json:"caption,omitempty"`
-	Type                InlineQueryType     `json:"type"`
-	CaptionEntities     []*MessageEntity    `json:"caption_entities,omitempty"`
-	PhotoHeight         int                 `json:"photo_height,omitempty"`
-	PhotoWidth          int                 `json:"photo_width,omitempty"`
+	ReplyMarkup           ReplyMarkup         `json:"reply_markup,omitempty"`
+	InputMessageContent   InputMessageContent `json:"input_message_content,omitempty"`
+	Title                 string              `json:"title,omitempty"`
+	ThumbnailURL          string              `json:"thumbnail_url"`
+	PhotoURL              string              `json:"photo_url"`
+	ParseMode             string              `json:"parse_mode,omitempty"`
+	ID                    string              `json:"id"`
+	Description           string              `json:"description,omitempty"`
+	Caption               string              `json:"caption,omitempty"`
+	Type                  InlineQueryType     `json:"type"`
+	CaptionEntities       []*MessageEntity    `json:"caption_entities,omitempty"`
+	PhotoHeight           int                 `json:"photo_height,omitempty"`
+	PhotoWidth            int                 `json:"photo_width,omitempty"`
+	ShowCaptionAboveMedia bool                `json:"show_caption_above_media,omitempty"`
 }
 
 // ImplementsInlineQueryResult is used to implement the InlineQueryResult interface.
@@ -112,20 +112,21 @@ func (i InlineQueryResultPhoto) ImplementsInlineQueryResult() {}
 // By default, this animated GIF file will be sent by the user with optional caption.
 // Alternatively, you can use InputMessageContent to send a message with the specified content instead of the animation.
 type InlineQueryResultGif struct {
-	InputMessageContent InputMessageContent `json:"input_message_content,omitempty"`
-	ReplyMarkup         ReplyMarkup         `json:"reply_markup,omitempty"`
-	Title               string              `json:"title,omitempty"`
-	GifURL              string              `json:"gif_url"`
-	ParseMode           string              `json:"parse_mode,omitempty"`
-	Caption             string              `json:"caption,omitempty"`
-	ThumbnailURL        string              `json:"thumbnail_url"`
-	ID                  string              `json:"id"`
-	ThumbnailMimeType   string              `json:"thumbnail_mime_type,omitempty"`
-	Type                InlineQueryType     `json:"type"`
-	CaptionEntities     []*MessageEntity    `json:"caption_entities,omitempty"`
-	GifDuration         int                 `json:"gif_duration,omitempty"`
-	GifHeight           int                 `json:"gif_height,omitempty"`
-	GifWidth            int                 `json:"gif_width,omitempty"`
+	InputMessageContent   InputMessageContent `json:"input_message_content,omitempty"`
+	ReplyMarkup           ReplyMarkup         `json:"reply_markup,omitempty"`
+	Title                 string              `json:"title,omitempty"`
+	GifURL                string              `json:"gif_url"`
+	ParseMode             string              `json:"parse_mode,omitempty"`
+	Caption               string              `json:"caption,omitempty"`
+	ThumbnailURL          string              `json:"thumbnail_url"`
+	ID                    string              `json:"id"`
+	ThumbnailMimeType     string              `json:"thumbnail_mime_type,omitempty"`
+	Type                  InlineQueryType     `json:"type"`
+	CaptionEntities       []*MessageEntity    `json:"caption_entities,omitempty"`
+	GifDuration           int                 `json:"gif_duration,omitempty"`
+	GifHeight             int                 `json:"gif_height,omitempty"`
+	GifWidth              int                 `json:"gif_width,omitempty"`
+	ShowCaptionAboveMedia bool                `json:"show_caption_above_media,omitempty"`
 }
 
 // ImplementsInlineQueryResult is used to implement the InlineQueryResult interface.
@@ -135,20 +136,21 @@ func (i InlineQueryResultGif) ImplementsInlineQueryResult() {}
 // By default, this animated MPEG-4 file will be sent by the user with optional caption.
 // Alternatively, you can use InputMessageContent to send a message with the specified content instead of the animation.
 type InlineQueryResultMpeg4Gif struct {
-	InputMessageContent InputMessageContent `json:"input_message_content,omitempty"`
-	ReplyMarkup         ReplyMarkup         `json:"reply_markup,omitempty"`
-	Title               string              `json:"title,omitempty"`
-	Mpeg4URL            string              `json:"mpeg4_url"`
-	ParseMode           string              `json:"parse_mode,omitempty"`
-	Caption             string              `json:"caption,omitempty"`
-	ThumbnailURL        string              `json:"thumbnail_url"`
-	ID                  string              `json:"id"`
-	ThumbnailMimeType   string              `json:"thumbnail_mime_type,omitempty"`
-	Type                InlineQueryType     `json:"type"`
-	CaptionEntities     []*MessageEntity    `json:"caption_entities,omitempty"`
-	Mpeg4Duration       int                 `json:"mpeg4_duration,omitempty"`
-	Mpeg4Height         int                 `json:"mpeg4_height,omitempty"`
-	Mpeg4Width          int                 `json:"mpeg4_width,omitempty"`
+	InputMessageContent   InputMessageContent `json:"input_message_content,omitempty"`
+	ReplyMarkup           ReplyMarkup         `json:"reply_markup,omitempty"`
+	Title                 string              `json:"title,omitempty"`
+	Mpeg4URL              string              `json:"mpeg4_url"`
+	ParseMode             string              `json:"parse_mode,omitempty"`
+	Caption               string              `json:"caption,omitempty"`
+	ThumbnailURL          string              `json:"thumbnail_url"`
+	ID                    string              `json:"id"`
+	ThumbnailMimeType     string              `json:"thumbnail_mime_type,omitempty"`
+	Type                  InlineQueryType     `json:"type"`
+	CaptionEntities       []*MessageEntity    `json:"caption_entities,omitempty"`
+	Mpeg4Duration         int                 `json:"mpeg4_duration,omitempty"`
+	Mpeg4Height           int                 `json:"mpeg4_height,omitempty"`
+	Mpeg4Width            int                 `json:"mpeg4_width,omitempty"`
+	ShowCaptionAboveMedia bool                `json:"show_caption_above_media,omitempty"`
 }
 
 // ImplementsInlineQueryResult is used to implement the InlineQueryResult interface.
@@ -158,21 +160,22 @@ func (i InlineQueryResultMpeg4Gif) ImplementsInlineQueryResult() {}
 // By default, this video file will be sent by the user with an optional caption.
 // Alternatively, you can use InputMessageContent to send a message with the specified content instead of the video.
 type InlineQueryResultVideo struct {
-	InputMessageContent InputMessageContent `json:"input_message_content,omitempty"`
-	ReplyMarkup         ReplyMarkup         `json:"reply_markup,omitempty"`
-	Description         string              `json:"description,omitempty"`
-	MimeType            string              `json:"mime_type"`
-	ThumbnailURL        string              `json:"thumbnail_url"`
-	Title               string              `json:"title"`
-	Caption             string              `json:"caption,omitempty"`
-	ID                  string              `json:"id"`
-	VideoURL            string              `json:"video_url"`
-	ParseMode           string              `json:"parse_mode,omitempty"`
-	Type                InlineQueryType     `json:"type"`
-	CaptionEntities     []*MessageEntity    `json:"caption_entities,omitempty"`
-	VideoHeight         int                 `json:"video_height,omitempty"`
-	VideoDuration       int                 `json:"video_duration,omitempty"`
-	VideoWidth          int                 `json:"video_width,omitempty"`
+	InputMessageContent   InputMessageContent `json:"input_message_content,omitempty"`
+	ReplyMarkup           ReplyMarkup         `json:"reply_markup,omitempty"`
+	Description           string              `json:"description,omitempty"`
+	MimeType              string              `json:"mime_type"`
+	ThumbnailURL          string              `json:"thumbnail_url"`
+	Title                 string              `json:"title"`
+	Caption               string              `json:"caption,omitempty"`
+	ID                    string              `json:"id"`
+	VideoURL              string              `json:"video_url"`
+	ParseMode             string              `json:"parse_mode,omitempty"`
+	Type                  InlineQueryType     `json:"type"`
+	CaptionEntities       []*MessageEntity    `json:"caption_entities,omitempty"`
+	VideoHeight           int                 `json:"video_height,omitempty"`
+	VideoDuration         int                 `json:"video_duration,omitempty"`
+	VideoWidth            int                 `json:"video_width,omitempty"`
+	ShowCaptionAboveMedia bool                `json:"show_caption_above_media,omitempty"`
 }
 
 // ImplementsInlineQueryResult is used to implement the InlineQueryResult interface.
@@ -323,16 +326,17 @@ func (i InlineQueryResultGame) ImplementsInlineQueryResult() {}
 // By default, this photo will be sent by the user with an optional caption.
 // Alternatively, you can use InputMessageContent to send a message with the specified content instead of the photo.
 type InlineQueryResultCachedPhoto struct {
-	ReplyMarkup         ReplyMarkup         `json:"reply_markup,omitempty"`
-	InputMessageContent InputMessageContent `json:"input_message_content,omitempty"`
-	Type                InlineQueryType     `json:"type"`
-	ID                  string              `json:"id"`
-	Description         string              `json:"description,omitempty"`
-	Caption             string              `json:"caption,omitempty"`
-	ParseMode           string              `json:"parse_mode,omitempty"`
-	PhotoFileID         string              `json:"photo_file_id"`
-	Title               string              `json:"title,omitempty"`
-	CaptionEntities     []*MessageEntity    `json:"caption_entities,omitempty"`
+	ReplyMarkup           ReplyMarkup         `json:"reply_markup,omitempty"`
+	InputMessageContent   InputMessageContent `json:"input_message_content,omitempty"`
+	Type                  InlineQueryType     `json:"type"`
+	ID                    string              `json:"id"`
+	Description           string              `json:"description,omitempty"`
+	Caption               string              `json:"caption,omitempty"`
+	ParseMode             string              `json:"parse_mode,omitempty"`
+	PhotoFileID           string              `json:"photo_file_id"`
+	Title                 string              `json:"title,omitempty"`
+	CaptionEntities       []*MessageEntity    `json:"caption_entities,omitempty"`
+	ShowCaptionAboveMedia bool                `json:"show_caption_above_media,omitempty"`
 }
 
 // ImplementsInlineQueryResult is used to implement the InlineQueryResult interface.
@@ -342,15 +346,16 @@ func (i InlineQueryResultCachedPhoto) ImplementsInlineQueryResult() {}
 // By default, this animated GIF file will be sent by the user with an optional caption.
 // Alternatively, you can use InputMessageContent to send a message with specified content instead of the animation.
 type InlineQueryResultCachedGif struct {
-	ReplyMarkup         ReplyMarkup         `json:"reply_markup,omitempty"`
-	InputMessageContent InputMessageContent `json:"input_message_content,omitempty"`
-	Type                InlineQueryType     `json:"type"`
-	Title               string              `json:"title,omitempty"`
-	Caption             string              `json:"caption,omitempty"`
-	ParseMode           string              `json:"parse_mode,omitempty"`
-	ID                  string              `json:"id"`
-	GifFileID           string              `json:"gif_file_id"`
-	CaptionEntities     []*MessageEntity    `json:"caption_entities,omitempty"`
+	ReplyMarkup           ReplyMarkup         `json:"reply_markup,omitempty"`
+	InputMessageContent   InputMessageContent `json:"input_message_content,omitempty"`
+	Type                  InlineQueryType     `json:"type"`
+	Title                 string              `json:"title,omitempty"`
+	Caption               string              `json:"caption,omitempty"`
+	ParseMode             string              `json:"parse_mode,omitempty"`
+	ID                    string              `json:"id"`
+	GifFileID             string              `json:"gif_file_id"`
+	CaptionEntities       []*MessageEntity    `json:"caption_entities,omitempty"`
+	ShowCaptionAboveMedia bool                `json:"show_caption_above_media,omitempty"`
 }
 
 // ImplementsInlineQueryResult is used to implement the InlineQueryResult interface.
@@ -360,15 +365,16 @@ func (i InlineQueryResultCachedGif) ImplementsInlineQueryResult() {}
 // By default, this animated MPEG-4 file will be sent by the user with an optional caption.
 // Alternatively, you can use InputMessageContent to send a message with the specified content instead of the animation.
 type InlineQueryResultCachedMpeg4Gif struct {
-	ReplyMarkup         ReplyMarkup         `json:"reply_markup,omitempty"`
-	InputMessageContent InputMessageContent `json:"input_message_content,omitempty"`
-	Type                InlineQueryType     `json:"type"`
-	Title               string              `json:"title,omitempty"`
-	Caption             string              `json:"caption,omitempty"`
-	ParseMode           string              `json:"parse_mode,omitempty"`
-	ID                  string              `json:"id"`
-	Mpeg4FileID         string              `json:"mpeg4_file_id"`
-	CaptionEntities     []*MessageEntity    `json:"caption_entities,omitempty"`
+	ReplyMarkup           ReplyMarkup         `json:"reply_markup,omitempty"`
+	InputMessageContent   InputMessageContent `json:"input_message_content,omitempty"`
+	Type                  InlineQueryType     `json:"type"`
+	Title                 string              `json:"title,omitempty"`
+	Caption               string              `json:"caption,omitempty"`
+	ParseMode             string              `json:"parse_mode,omitempty"`
+	ID                    string              `json:"id"`
+	Mpeg4FileID           string              `json:"mpeg4_file_id"`
+	CaptionEntities       []*MessageEntity    `json:"caption_entities,omitempty"`
+	ShowCaptionAboveMedia bool                `json:"show_caption_above_media,omitempty"`
 }
 
 // ImplementsInlineQueryResult is used to implement the InlineQueryResult interface.
@@ -411,16 +417,17 @@ func (i InlineQueryResultCachedDocument) ImplementsInlineQueryResult() {}
 // By default, this video file will be sent by the user with an optional caption.
 // Alternatively, you can use InputMessageContent to send a message with the specified content instead of the video.
 type InlineQueryResultCachedVideo struct {
-	ReplyMarkup         ReplyMarkup         `json:"reply_markup,omitempty"`
-	InputMessageContent InputMessageContent `json:"input_message_content,omitempty"`
-	Type                InlineQueryType     `json:"type"`
-	ID                  string              `json:"id"`
-	Description         string              `json:"description,omitempty"`
-	Caption             string              `json:"caption,omitempty"`
-	ParseMode           string              `json:"parse_mode,omitempty"`
-	VideoFileID         string              `json:"video_file_id"`
-	Title               string              `json:"title"`
-	CaptionEntities     []*MessageEntity    `json:"caption_entities,omitempty"`
+	ReplyMarkup           ReplyMarkup         `json:"reply_markup,omitempty"`
+	InputMessageContent   InputMessageContent `json:"input_message_content,omitempty"`
+	Type                  InlineQueryType     `json:"type"`
+	ID                    string              `json:"id"`
+	Description           string              `json:"description,omitempty"`
+	Caption               string              `json:"caption,omitempty"`
+	ParseMode             string              `json:"parse_mode,omitempty"`
+	VideoFileID           string              `json:"video_file_id"`
+	Title                 string              `json:"title"`
+	CaptionEntities       []*MessageEntity    `json:"caption_entities,omitempty"`
+	ShowCaptionAboveMedia bool                `json:"show_caption_above_media,omitempty"`
 }
 
 // ImplementsInlineQueryResult is used to implement the InlineQueryResult interface.
@@ -468,10 +475,10 @@ type InputMessageContent interface {
 
 // InputTextMessageContent represents the content of a text message to be sent as the result of an inline query.
 type InputTextMessageContent struct {
+	LinkPreviewOptions *LinkPreviewOptions `json:"link_preview_options,omitempty"`
 	MessageText        string              `json:"message_text"`
 	ParseMode          string              `json:"parse_mode,omitempty"`
 	Entities           []*MessageEntity    `json:"entities,omitempty"`
-	LinkPreviewOptions *LinkPreviewOptions `json:"link_preview_options,omitempty"`
 }
 
 // ImplementsInputMessageContent is used to implement the InputMessageContent interface.
@@ -516,12 +523,45 @@ type InputContactMessageContent struct {
 // ImplementsInputMessageContent is used to implement the InputMessageContent interface.
 func (i InputContactMessageContent) ImplementsInputMessageContent() {}
 
+// InputInvoiceMessageContent represents the content of an invoice message to be sent as the result of an inline query.
+type InputInvoiceMessageContent struct {
+	SuggestedTipAmounts       *[]int         `json:"suggested_tip_amounts,omitempty"`
+	PhotoURL                  string         `json:"photo_url,omitempty"`
+	Description               string         `json:"description"`
+	Payload                   string         `json:"string"`
+	ProviderToken             string         `json:"provider_token,omitempty"`
+	Currency                  string         `json:"currency"`
+	Title                     string         `json:"title"`
+	ProviderData              string         `json:"provider_data,omitempty"`
+	Prices                    []LabeledPrice `json:"prices"`
+	PhotoSize                 int            `json:"photo_size,omitempty"`
+	MaxTipAmount              int            `json:"max_tip_amount,omitempty"`
+	PhotoWidth                int            `json:"photo_width,omitempty"`
+	PhotoHeight               int            `json:"photo_height,omitempty"`
+	NeedName                  bool           `json:"need_name,omitempty"`
+	NeedPhoneNumber           bool           `json:"need_phone_number,omitempty"`
+	NeedEmail                 bool           `json:"need_email,omitempty"`
+	NeedShippingAddress       bool           `json:"need_shipping_address,omitempty"`
+	SendPhoneNumberToProvider bool           `json:"send_phone_number_to_provider,omitempty"`
+	SendEmailToProvider       bool           `json:"send_email_to_provider,omitempty"`
+	IsFlexible                bool           `json:"is_flexible,omitempty"`
+}
+
+// ImplementsInputMessageContent is used to implement the InputMessageContent interface.
+func (i InputInvoiceMessageContent) ImplementsInputMessageContent() {}
+
 // InlineQueryResultsButton represents a button to be shown above inline query results.
 // You MUST use exactly one of the fields.
 type InlineQueryResultsButton struct {
 	WebApp         WebAppInfo `json:"web_app,omitempty"`
 	StartParameter string     `json:"start_parameter,omitempty"`
 	Text           string     `json:"text"`
+}
+
+// PreparedInlineMessage describes an inline message to be sent by a user of a Mini App.
+type PreparedInlineMessage struct {
+	ID             string `json:"id"`
+	ExpirationDate int    `json:"expiration_date"`
 }
 
 // InlineQueryOptions is a custom type which contains the various options required by the AnswerInlineQuery method.
@@ -532,6 +572,14 @@ type InlineQueryOptions struct {
 	IsPersonal bool                     `query:"is_personal"`
 }
 
+// PreparedInlineMessageOptions is a custom type which contains the various options required by the SavePreparedInlineMessage method.
+type PreparedInlineMessageOptions struct {
+	AllowUserChats    bool `query:"allow_user_chats"`
+	AllowBotChats     bool `query:"allow_bot_chats"`
+	AllowGroupChats   bool `query:"allow_group_chats"`
+	AllowChannelChats bool `query:"allow_channel_chats"`
+}
+
 // AnswerInlineQuery is used to send answers to an inline query.
 func (a API) AnswerInlineQuery(inlineQueryID string, results []InlineQueryResult, opts *InlineQueryOptions) (res APIResponseBase, err error) {
 	var vals = make(url.Values)
@@ -539,5 +587,15 @@ func (a API) AnswerInlineQuery(inlineQueryID string, results []InlineQueryResult
 	jsn, _ := json.Marshal(results)
 	vals.Set("inline_query_id", inlineQueryID)
 	vals.Set("results", string(jsn))
-	return get[APIResponseBase](a.base, "answerInlineQuery", addValues(vals, opts))
+	return res, a.lclient.get(a.base, "answerInlineQuery", addValues(vals, opts), &res)
+}
+
+// SavePreparedInlineMessage stores a message that can be sent by a user of a Mini App.
+func (a API) SavePreparedInlineMessage(userID int64, result InlineQueryResult, opts *PreparedInlineMessageOptions) (res APIResponsePreparedInlineMessage, err error) {
+	var vals = make(url.Values)
+
+	jsn, _ := json.Marshal(result)
+	vals.Set("user_id", itoa(userID))
+	vals.Set("result", string(jsn))
+	return res, a.lclient.get(a.base, "savePreparedInlineMessage", addValues(vals, opts), &res)
 }

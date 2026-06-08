@@ -5,6 +5,8 @@ config.yml
 docker-compose.yml
 compose-dev.yml
 Makefile
+.DS_Store
+build/
 
 # If you prefer the allow list template instead of the deny list, see community template:
 # https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore

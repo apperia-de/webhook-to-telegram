@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM golang:1.21-alpine AS build-stage
+FROM golang:1.26-alpine AS build-stage
 # Set destination for COPY
 WORKDIR /app
 
@@ -11,15 +11,15 @@ WORKDIR /app
 # https://docs.docker.com/engine/reference/builder/#copy
 COPY . ./
 # Build
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/wh2t cmd/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/whtt cmd/main.go
 
 # Deploy the application binary into a lean image
 #FROM gcr.io/distroless/base-debian12 AS build-release-stage
-FROM gcr.io/distroless/static-debian12 AS build-release-stage
+FROM gcr.io/distroless/static-debian13 AS build-release-stage
 
 WORKDIR /
 
-COPY --from=build-stage /app/wh2t /app/config.yml ./
+COPY --from=build-stage /app/whtt /app/config.yml ./
 
 USER nonroot:nonroot
 
@@ -31,4 +31,4 @@ USER nonroot:nonroot
 EXPOSE 8080
 
 # Run
-CMD ["/wh2t"]
+CMD ["/whtt"]
