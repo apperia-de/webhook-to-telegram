@@ -7,10 +7,10 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
-	"github.com/NicoNex/echotron/v3"
 	"github.com/sknr/webhook-to-telegram/internal/telegram"
 	"gopkg.in/yaml.v3"
 )
@@ -48,7 +48,7 @@ type Webhook struct {
 	Pattern        string             `yaml:"pattern"`
 	ContentType    string             `yaml:"contentType"`
 	FormKey        string             `yaml:"formKey"`
-	ParseMode      echotron.ParseMode `yaml:"parseMode"`
+	ParseMode      telegram.ParseMode `yaml:"parseMode"`
 	TelegramChatID *int64             `yaml:"telegramChatID,omitempty"`
 	Verification   ValidationType     `yaml:"verification"`
 	Templates      []*Template        `yaml:"templates,omitempty"`
@@ -82,7 +82,7 @@ type WebhookServer struct {
 	httpServer *http.Server
 	mux        *http.ServeMux
 	config     *Config
-	api        echotron.API
+	api        *telegram.Client
 }
 
 func New() (*WebhookServer, error) {
@@ -107,10 +107,48 @@ func (s *WebhookServer) GetHttpServer() *http.Server {
 }
 
 func (s *WebhookServer) Start() {
-	t := telegram.New(s.config.Telegram.BotToken)
-	dsp := echotron.NewDispatcher(s.config.Telegram.BotToken, t.NewBot)
-	dsp.SetHTTPServer(s.GetHttpServer())
-	log.Println(dsp.ListenWebhook(s.config.Telegram.WebhookURL))
+	u, err := url.Parse(s.config.Telegram.WebhookURL)
+	if err != nil {
+		log.Fatalf("invalid webhook URL: %v", err)
+	}
+	path := u.Path
+	if path == "" || path == "/" {
+		path = "/telegram-webhook"
+	}
+
+	// We should register the webhook URL with Telegram
+	if err := s.api.SetWebhook(s.config.Telegram.WebhookURL); err != nil {
+		log.Printf("Warning: failed to set Telegram webhook: %v", err)
+	}
+
+	s.mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		var update telegram.Update
+		if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
+			log.Println("failed to decode telegram update:", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		if update.Message != nil && update.Message.Text == "/id" {
+			chatID := update.Message.Chat.ID
+			msgText := fmt.Sprintf("Your ChatID is: %d", chatID)
+			if err := s.api.SendMessage(chatID, msgText, ""); err != nil {
+				log.Println("failed to send /id response message:", err)
+			}
+		}
+
+		w.WriteHeader(http.StatusOK)
+	})
+
+	log.Printf("Starting HTTP server on %s", s.httpServer.Addr)
+	if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("HTTP server failed: %v", err)
+	}
 }
 
 func (s *WebhookServer) initialize() error {
@@ -128,7 +166,7 @@ func (s *WebhookServer) initialize() error {
 		return fmt.Errorf("required telegram chatID is missing")
 	}
 
-	s.api = echotron.NewAPI(s.config.Telegram.BotToken)
+	s.api = telegram.NewClient(s.config.Telegram.BotToken)
 
 	for _, wh := range s.config.Webhooks {
 		if wh.FormKey == "" {
@@ -230,15 +268,7 @@ func (s *WebhookServer) createWebhookHandlers(webhooks []*Webhook) {
 
 			text := fmt.Sprintf(t.Template, values...)
 
-			var opt *echotron.MessageOptions
-			if wh.ParseMode != "" {
-				log.Println("send message in parseMode:", wh.ParseMode)
-				opt = &echotron.MessageOptions{
-					ParseMode: wh.ParseMode,
-				}
-			}
-
-			_, err = s.api.SendMessage(text, s.getChatID(wh), opt)
+			err = s.api.SendMessage(s.getChatID(wh), text, wh.ParseMode)
 			if err != nil {
 				log.Println("cannot send telegram message:", err)
 				w.WriteHeader(http.StatusBadGateway)
@@ -344,13 +374,13 @@ func (s *WebhookServer) getChatID(wh *Webhook) int64 {
 //
 // parseMode is the text formatting mode (ModeMarkdown, ModeMarkdownV2 or ModeHTML)
 // text is the input string that will be escaped
-func (s *WebhookServer) escapeText(parseMode echotron.ParseMode, text string) string {
+func (s *WebhookServer) escapeText(parseMode telegram.ParseMode, text string) string {
 	switch parseMode {
-	case echotron.HTML:
+	case telegram.HTML:
 		return htmlReplacer.Replace(text)
-	case echotron.Markdown:
+	case telegram.Markdown:
 		return markdownReplacer.Replace(text)
-	case echotron.MarkdownV2:
+	case telegram.MarkdownV2:
 		return markdownV2Replacer.Replace(text)
 	default:
 		return ""

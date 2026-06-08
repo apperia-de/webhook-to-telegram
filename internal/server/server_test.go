@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/NicoNex/echotron/v3"
+	"github.com/sknr/webhook-to-telegram/internal/telegram"
 )
 
 type roundTripperFunc func(*http.Request) (*http.Response, error)
@@ -69,13 +69,13 @@ func TestEscapeText(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		parseMode echotron.ParseMode
+		parseMode telegram.ParseMode
 		input     string
 		expected  string
 	}{
-		{"HTML simple", echotron.HTML, "hello <world> & friends", "hello &lt;world&gt; &amp; friends"},
-		{"Markdown simple", echotron.Markdown, "hello _world_ *bold* `code` [link", "hello \\_world\\_ \\*bold\\* \\`code\\` \\[link"},
-		{"MarkdownV2 all", echotron.MarkdownV2, "_*[]()~`>#+-=|{}.!", "\\_\\*\\[\\]\\(\\)\\~\\`\\>\\#\\+\\-\\=\\|\\{\\}\\.\\!"},
+		{"HTML simple", telegram.HTML, "hello <world> & friends", "hello &lt;world&gt; &amp; friends"},
+		{"Markdown simple", telegram.Markdown, "hello _world_ *bold* `code` [link", "hello \\_world\\_ \\*bold\\* \\`code\\` \\[link"},
+		{"MarkdownV2 all", telegram.MarkdownV2, "_*[]()~`>#+-=|{}.!", "\\_\\*\\[\\]\\(\\)\\~\\`\\>\\#\\+\\-\\=\\|\\{\\}\\.\\!"},
 		{"Invalid/None parse mode", "none", "hello", ""},
 	}
 
@@ -252,6 +252,15 @@ func TestWebhookHandlerSuccess(t *testing.T) {
 				StatusCode: http.StatusOK,
 				Header:     make(http.Header),
 				Body:       io.NopCloser(bytes.NewBufferString(`{"ok": true, "result": {"message_id": 12345}}`)),
+			}
+			resp.Header.Set("Content-Type", "application/json")
+			return resp, nil
+		}
+		if req.URL.Host == "api.telegram.org" && strings.Contains(req.URL.Path, "/botfake-token/setWebhook") {
+			resp := &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(bytes.NewBufferString(`{"ok": true}`)),
 			}
 			resp.Header.Set("Content-Type", "application/json")
 			return resp, nil

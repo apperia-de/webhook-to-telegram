@@ -11,7 +11,7 @@ services like GitHub, Kofi, PayPal, etc. and sends them as Telegram messages.
 
 1. Create a Telegram bot via [BotFather](https://t.me/botfather) and obtain a bot token.
 2. Copy or rename `config_example.yml` to `config.yml` and configure to your desired webhook service needs. (see example below)
-3. Build cmd/main.go via `go build main.go -o wh2t` and run the Telegram bot server.
+3. Build cmd/main.go via `go build main.go -o whtt` and run the Telegram bot server.
 
 ## Example: config.yml
 
@@ -82,4 +82,4 @@ probably not all available use cases for webhook messages will be supported "out
 If you would like to contribute, I'll be happy to review your PR.
 
 ## Support
-If you like the project and find it useful, I'd be grateful if you [buy me a ☕](https://ko-fi.com/callmemisterk).
+If you like the project and find it useful, I'd be grateful if you [sponsor me on GitHub](https://github.com/sponsors/sknr) 💖.

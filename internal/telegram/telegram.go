@@ -1,0 +1,107 @@
+package telegram
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+)
+
+type ParseMode string
+
+const (
+	HTML       ParseMode = "HTML"
+	Markdown   ParseMode = "Markdown"
+	MarkdownV2 ParseMode = "MarkdownV2"
+)
+
+type Update struct {
+	UpdateID int64    `json:"update_id"`
+	Message  *Message `json:"message,omitempty"`
+}
+
+type Message struct {
+	MessageID int64  `json:"message_id"`
+	Chat      Chat   `json:"chat"`
+	Text      string `json:"text,omitempty"`
+}
+
+type Chat struct {
+	ID int64 `json:"id"`
+}
+
+type Client struct {
+	botToken string
+	apiURL   string
+	hc       *http.Client
+}
+
+func NewClient(botToken string) *Client {
+	return &Client{
+		botToken: botToken,
+		apiURL:   fmt.Sprintf("https://api.telegram.org/bot%s", botToken),
+		hc:       &http.Client{},
+	}
+}
+
+// CustomClient allows using a mock or custom Telegram base URL (useful for testing)
+func CustomClient(baseURL, botToken string) *Client {
+	return &Client{
+		botToken: botToken,
+		apiURL:   baseURL,
+		hc:       &http.Client{},
+	}
+}
+
+func (c *Client) SendMessage(chatID int64, text string, parseMode ParseMode) error {
+	payload := map[string]any{
+		"chat_id": chatID,
+		"text":    text,
+	}
+	if parseMode != "" {
+		payload["parse_mode"] = string(parseMode)
+	}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.hc.Post(c.apiURL+"/sendMessage", "application/json", bytes.NewBuffer(data))
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("telegram API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+func (c *Client) SetWebhook(webhookURL string) error {
+	payload := map[string]any{
+		"url": webhookURL,
+	}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.hc.Post(c.apiURL+"/setWebhook", "application/json", bytes.NewBuffer(data))
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("telegram API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
