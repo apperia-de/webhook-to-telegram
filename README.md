@@ -114,6 +114,68 @@ webhooks:
 
 ---
 
+## Configuration Reference
+
+The `config.yml` file is structured into two main components: `telegram` (global settings) and `webhooks` (routing, security, and template formatting rules).
+
+### 1. Global Settings (`telegram`)
+
+| Option | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `botToken` | String | Yes | Your Telegram Bot token obtained from [@BotFather](https://t.me/botfather). |
+| `chatID` | Integer | Yes | Default Telegram Chat or Group ID to send messages to. |
+| `webhookURL` | String | Yes | Your server's public Telegram webhook endpoint URL (e.g. `https://yourdomain.com/telegram-webhook`). |
+
+---
+
+### 2. Webhook Rules (`webhooks`)
+
+Define a list of incoming endpoints. Each entry supports the following fields:
+
+| Option | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `name` | String | | A descriptive label for this webhook (e.g., `GitHub Stars`). |
+| `pattern` | String | | The URL route path suffix. Handled under `/webhooks/<pattern>`. |
+| `contentType` | String | `application/json` | Expected HTTP content type: `application/json` or `application/x-www-form-urlencoded`. |
+| `formKey` | String | `payload` | *(For URL-encoded requests)* The form parameter key containing the JSON string. |
+| `parseMode` | String | `none` | Markdown/HTML formatting mode: `html`, `markdown`, or `markdownv2` (case-insensitive). |
+| `telegramChatID`| Integer | *(global chatID)* | Override the global chat ID to send these specific events to a different chat/group. |
+| `verification` | Object | `none` | Security authentication parameters (see below). |
+| `templates` | Array | | Formatting and routing rules for generating the Telegram alerts. |
+
+#### Webhook Authentication (`verification`)
+Prevent unauthorized request forwarding using one of the following methods:
+*   `type: none` — No signature verification or validation is performed.
+*   `type: header` — Compares the value of a specific HTTP request header against your configured `value`.
+    *   *Example:* Compare `X-GitHub-Hook-ID` header.
+*   `type: message` — Compares a JSON key/field value inside the webhook payload against your configured `value`.
+*   `type: swt` — Future-proof IETF Secure Webhook Token signature verification using HMAC-SHA256 and body integrity hashing. The `value` is the shared secret.
+
+---
+
+### 3. Message Templates (`templates`)
+
+Templates define what text is sent to Telegram, what parameters are extracted, and when the message is triggered.
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `template` | String | A Go-style format string using placeholders (e.g., `%s` for strings, `%d` for integers, `%.f` for floats, `%v` for generic/any value). |
+| `keys` | Array of Strings | Ordered list of keys to fetch values for replacing the placeholders in the template. (See Key Selector Syntax below). |
+| `trigger` | Object | *(Optional)* Filters when this template is used. Executes only if the trigger key value matches the target value. |
+
+#### Key Selector Syntax (`keys` & `trigger.key`)
+To extract values dynamically, use these selector types in your `keys` list or triggers:
+1.  **Plain/Nested Keys**: Access JSON properties. Use dot-notation for nested structures.
+    *   *Example:* `action` (resolves to top-level `"action"` field)
+    *   *Example:* `repository.name` (resolves to `repository: { name: "..." }`)
+2.  **HTTP Headers**: Read the request headers by prefixing with `header:`.
+    *   *Example:* `header:X-GitHub-Event`
+3.  **SWT Claims**: Read verified values from the Secure Webhook Token context by prefixing with `swt:`.
+    *   *Example:* `swt:event` (the verified webhook event type)
+    *   *Example:* `swt:retry_count` (the verified webhook retry count)
+
+---
+
 ## General Considerations
 
 Since webhooks vary between services, we built a highly flexible parser. If your webhook service requires a special formatting scheme or verification type that is not yet supported, please feel free to open an issue or submit a pull request!
