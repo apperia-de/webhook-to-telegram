@@ -54,3 +54,20 @@ webhooks:
           type: message # Take the value either from the message or from the header for comparing with value
           key: action
           value: deleted
+
+  - name: secure-service.com (Secure Webhook Token)
+    pattern: secure-service
+    contentType: application/json
+    verification:
+      type: swt # Secure Webhook Token (IETF draft standard)
+      value: "my-shared-secret-key-used-for-signing-swt-token"
+    templates:
+      - template: "Secure Event: %s received!\nRetry count: %v\nPayment from %q is successful."
+        keys:
+          - swt:event # Virtual key to access the verified event name in the SWT token
+          - swt:retry_count # Virtual key to access the verified retry count in the SWT token
+          - customer.name
+        trigger:
+          type: message
+          key: swt:event
+          value: payment.completed

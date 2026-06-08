@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"fmt"
@@ -10,7 +11,9 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
+	"github.com/sknr/webhook-to-telegram/internal/swt"
 	"github.com/sknr/webhook-to-telegram/internal/telegram"
 	"gopkg.in/yaml.v3"
 )
@@ -27,6 +30,9 @@ const (
 	TypeHeader  = "header"
 	TypeMessage = "message"
 )
+
+type contextKey string
+const swtClaimsKey contextKey = "swtClaims"
 
 var (
 	htmlReplacer       = strings.NewReplacer("<", "&lt;", ">", "&gt;", "&", "&amp;")
@@ -67,7 +73,7 @@ type Template struct {
 }
 
 type ValidationType struct {
-	Type  string `yaml:"type"` // Either header or message
+	Type  string `yaml:"type"` // Either header, message or swt
 	Key   string `yaml:"key"`
 	Value string `yaml:"value"`
 }
@@ -172,6 +178,14 @@ func (s *WebhookServer) initialize() error {
 		if wh.FormKey == "" {
 			wh.FormKey = DefaultFormKey
 		}
+		switch strings.ToLower(string(wh.ParseMode)) {
+		case "html":
+			wh.ParseMode = telegram.HTML
+		case "markdown":
+			wh.ParseMode = telegram.Markdown
+		case "markdownv2":
+			wh.ParseMode = telegram.MarkdownV2
+		}
 	}
 
 	s.createWebhookHandlers(s.config.Webhooks)
@@ -217,24 +231,33 @@ func (s *WebhookServer) createWebhookHandlers(webhooks []*Webhook) {
 				}
 				dataBytes = body
 			default:
-				log.Printf("Unsupported ContentType: %s", headerContentType)
-				w.WriteHeader(http.StatusNotAcceptable)
-				return
+				// SWT might not require JSON content-type if the body is empty,
+				// but let's allow empty bodies or fall through.
+				if wh.Verification.Type == "swt" && r.ContentLength == 0 {
+					dataBytes = nil
+				} else {
+					log.Printf("Unsupported ContentType: %s", headerContentType)
+					w.WriteHeader(http.StatusNotAcceptable)
+					return
+				}
 			}
 
-			// Log received data
-			log.Println(string(dataBytes))
+			// Log received data (only if body is present)
+			if len(dataBytes) > 0 {
+				log.Println(string(dataBytes))
+			}
 
 			var msg map[string]any
-
-			err = json.Unmarshal(dataBytes, &msg)
-			if err != nil {
-				log.Println(err)
-				w.WriteHeader(http.StatusBadRequest)
-				return
+			if len(dataBytes) > 0 {
+				err = json.Unmarshal(dataBytes, &msg)
+				if err != nil {
+					log.Println(err)
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
 			}
 
-			if !s.isValid(wh, r, msg) {
+			if !s.isValid(wh, &r, msg, dataBytes) {
 				log.Printf("Invalid webhook message!")
 				w.WriteHeader(http.StatusUnauthorized)
 				return
@@ -255,7 +278,7 @@ func (s *WebhookServer) createWebhookHandlers(webhooks []*Webhook) {
 
 			var values []any
 			for _, key := range t.Keys {
-				val := getValue(key, msg, r.Header)
+				val := getValue(key, msg, r)
 				if val == nil {
 					values = append(values, "")
 					continue
@@ -295,7 +318,7 @@ func findMatchingTemplate(r *http.Request, msg map[string]any, templates []*Temp
 		case TypeHeader:
 			triggerVal = r.Header.Get(t.Trigger.Key)
 		case TypeMessage:
-			val := getValue(t.Trigger.Key, msg, r.Header)
+			val := getValue(t.Trigger.Key, msg, r)
 			if val == nil {
 				triggerVal = ""
 			} else {
@@ -313,32 +336,58 @@ func findMatchingTemplate(r *http.Request, msg map[string]any, templates []*Temp
 	return nil, nil
 }
 
-func (s *WebhookServer) isValid(wh *Webhook, r *http.Request, msg map[string]any) bool {
+func (s *WebhookServer) isValid(wh *Webhook, r **http.Request, msg map[string]any, body []byte) bool {
 	var val string
 	switch wh.Verification.Type {
 	case TypeNone:
 		return true
 	case TypeMessage:
-		valVal := getValue(wh.Verification.Key, msg, r.Header)
+		valVal := getValue(wh.Verification.Key, msg, *r)
 		if valVal == nil {
 			val = ""
 		} else {
 			val = fmt.Sprintf("%v", valVal)
 		}
 	case TypeHeader:
-		val = r.Header.Get(wh.Verification.Key)
+		val = (*r).Header.Get(wh.Verification.Key)
+	case "swt":
+		authHeader := (*r).Header.Get("Authorization")
+		if !strings.HasPrefix(authHeader, "Bearer ") {
+			return false
+		}
+		token := strings.TrimPrefix(authHeader, "Bearer ")
+		claims, err := swt.Verify(token, []byte(wh.Verification.Value), body, time.Now())
+		if err != nil {
+			log.Printf("SWT verification failed: %v", err)
+			return false
+		}
+		*r = (*r).WithContext(context.WithValue((*r).Context(), swtClaimsKey, claims))
+		return true
 	default:
 		return false
 	}
 	return subtle.ConstantTimeCompare([]byte(val), []byte(wh.Verification.Value)) == 1
 }
 
-func getValue(key string, msg map[string]any, header http.Header) any {
+func getValue(key string, msg map[string]any, r *http.Request) any {
+	if key == "swt:event" {
+		if claims, ok := r.Context().Value(swtClaimsKey).(*swt.Claims); ok {
+			return claims.Webhook.Event
+		}
+		return nil
+	}
+	if key == "swt:retry_count" {
+		if claims, ok := r.Context().Value(swtClaimsKey).(*swt.Claims); ok && claims.Webhook.RetryCount != nil {
+			return *claims.Webhook.RetryCount
+		}
+		return nil
+	}
+
 	// Check if the value should be in a custom header.
 	if strings.Contains(key, "header:") {
 		parts := strings.Split(key, "header:")
 		if len(parts) == 2 {
-			return header.Get(parts[1])
+			return r.Header.Get(parts[1])
 		}
 		return nil
 	}
@@ -375,12 +424,12 @@ func (s *WebhookServer) getChatID(wh *Webhook) int64 {
 // parseMode is the text formatting mode (ModeMarkdown, ModeMarkdownV2 or ModeHTML)
 // text is the input string that will be escaped
 func (s *WebhookServer) escapeText(parseMode telegram.ParseMode, text string) string {
-	switch parseMode {
-	case telegram.HTML:
+	switch strings.ToLower(string(parseMode)) {
+	case "html":
 		return htmlReplacer.Replace(text)
-	case telegram.Markdown:
+	case "markdown":
 		return markdownReplacer.Replace(text)
-	case telegram.MarkdownV2:
+	case "markdownv2":
 		return markdownV2Replacer.Replace(text)
 	default:
 		return ""

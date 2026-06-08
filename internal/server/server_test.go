@@ -2,6 +2,10 @@ package server
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,6 +23,53 @@ func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
 }
 
+func generateSWTToken(event string, body []byte, secret []byte) (string, error) {
+	var bodyHash string
+	if len(body) > 0 {
+		h := sha256.Sum256(body)
+		bodyHash = fmt.Sprintf("sha-256:%x", h[:])
+	}
+
+	type WebhookClaim struct {
+		Event string `json:"event"`
+		Hash  string `json:"hash,omitempty"`
+	}
+	type Claims struct {
+		Webhook WebhookClaim `json:"webhook"`
+		Exp     int64        `json:"exp"`
+	}
+
+	claims := &Claims{
+		Webhook: WebhookClaim{
+			Event: event,
+			Hash:  bodyHash,
+		},
+		Exp: 9999999999, // far future
+	}
+
+	type Header struct {
+		Alg string `json:"alg"`
+		Typ string `json:"typ"`
+	}
+
+	header := Header{
+		Alg: "HS256",
+		Typ: "SWT",
+	}
+
+	headerBytes, _ := json.Marshal(header)
+	headerSegment := base64.RawURLEncoding.EncodeToString(headerBytes)
+
+	payloadBytes, _ := json.Marshal(claims)
+	payloadSegment := base64.RawURLEncoding.EncodeToString(payloadBytes)
+
+	mac := hmac.New(sha256.New, secret)
+	mac.Write([]byte(headerSegment + "." + payloadSegment))
+	signatureSegment := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+
+	return headerSegment + "." + payloadSegment + "." + signatureSegment, nil
+}
+
 func TestGetValue(t *testing.T) {
 	msg := map[string]any{
 		"action": "started",
@@ -33,8 +84,8 @@ func TestGetValue(t *testing.T) {
 		"int_val":  42,
 	}
 
-	header := make(http.Header)
-	header.Set("X-Test-Header", "header-value")
+	req := httptest.NewRequest("POST", "/webhooks/test", nil)
+	req.Header.Set("X-Test-Header", "header-value")
 
 	tests := []struct {
 		name     string
@@ -56,7 +107,7 @@ func TestGetValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := getValue(tt.key, msg, header)
+			got := getValue(tt.key, msg, req)
 			if got != tt.expected {
 				t.Errorf("getValue(%q) = %v, want %v", tt.key, got, tt.expected)
 			}
@@ -94,19 +145,35 @@ func TestIsValid(t *testing.T) {
 	msg := map[string]any{
 		"token": "secret-token",
 	}
+
+	// For non-SWT tests
 	req := httptest.NewRequest("POST", "/webhooks/test", nil)
 	req.Header.Set("X-Hook-ID", "12345")
 
+	// For SWT test
+	secretKey := []byte("my-swt-secret")
+	bodyBytes := []byte(`{"customer":{"name":"alice"}}`)
+	swtToken, err := generateSWTToken("payment.completed", bodyBytes, secretKey)
+	if err != nil {
+		t.Fatalf("failed to generate SWT: %v", err)
+	}
+
+	reqSWT := httptest.NewRequest("POST", "/webhooks/test", bytes.NewBuffer(bodyBytes))
+	reqSWT.Header.Set("Authorization", "Bearer "+swtToken)
+
 	tests := []struct {
-		name     string
-		webhook  *Webhook
-		expected bool
+		name      string
+		webhook   *Webhook
+		req       *http.Request
+		bodyBytes []byte
+		expected  bool
 	}{
 		{
 			name: "TypeNone",
 			webhook: &Webhook{
 				Verification: ValidationType{Type: TypeNone},
 			},
+			req:      req,
 			expected: true,
 		},
 		{
@@ -118,6 +185,7 @@ func TestIsValid(t *testing.T) {
 					Value: "12345",
 				},
 			},
+			req:      req,
 			expected: true,
 		},
 		{
@@ -129,6 +197,7 @@ func TestIsValid(t *testing.T) {
 					Value: "wrong",
 				},
 			},
+			req:      req,
 			expected: false,
 		},
 		{
@@ -140,6 +209,7 @@ func TestIsValid(t *testing.T) {
 					Value: "secret-token",
 				},
 			},
+			req:      req,
 			expected: true,
 		},
 		{
@@ -151,7 +221,32 @@ func TestIsValid(t *testing.T) {
 					Value: "wrong-token",
 				},
 			},
+			req:      req,
 			expected: false,
+		},
+		{
+			name: "SWT Success Match",
+			webhook: &Webhook{
+				Verification: ValidationType{
+					Type:  "swt",
+					Value: string(secretKey),
+				},
+			},
+			req:       reqSWT,
+			bodyBytes: bodyBytes,
+			expected:  true,
+		},
+		{
+			name: "SWT Mismatch Token",
+			webhook: &Webhook{
+				Verification: ValidationType{
+					Type:  "swt",
+					Value: "wrong-secret-key",
+				},
+			},
+			req:       reqSWT,
+			bodyBytes: bodyBytes,
+			expected:  false,
 		},
 		{
 			name: "Unknown verification type",
@@ -160,13 +255,15 @@ func TestIsValid(t *testing.T) {
 					Type: "invalid",
 				},
 			},
+			req:      req,
 			expected: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := s.isValid(tt.webhook, req, msg)
+			rCopy := tt.req
+			got := s.isValid(tt.webhook, &rCopy, msg, tt.bodyBytes)
 			if got != tt.expected {
 				t.Errorf("isValid() = %v, want %v", got, tt.expected)
 			}
@@ -309,5 +406,101 @@ webhooks:
 
 	if !receivedTelegramRequest {
 		t.Error("expected Telegram API call, but none was received")
+	}
+}
+
+func TestWebhookHandlerSWT(t *testing.T) {
+	oldTransport := http.DefaultTransport
+	defer func() { http.DefaultTransport = oldTransport }()
+
+	var receivedTelegramRequest bool
+	var receivedMessageText string
+
+	http.DefaultTransport = roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Host == "api.telegram.org" && strings.Contains(req.URL.Path, "/botfake-token/sendMessage") {
+			receivedTelegramRequest = true
+
+			var payload map[string]any
+			_ = json.NewDecoder(req.Body).Decode(&payload)
+			receivedMessageText = payload["text"].(string)
+
+			resp := &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(bytes.NewBufferString(`{"ok": true, "result": {"message_id": 12345}}`)),
+			}
+			resp.Header.Set("Content-Type", "application/json")
+			return resp, nil
+		}
+		if req.URL.Host == "api.telegram.org" && strings.Contains(req.URL.Path, "/botfake-token/setWebhook") {
+			resp := &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(bytes.NewBufferString(`{"ok": true}`)),
+			}
+			resp.Header.Set("Content-Type", "application/json")
+			return resp, nil
+		}
+		return nil, fmt.Errorf("unexpected request to %s", req.URL)
+	})
+
+	cfgContent := `
+telegram:
+  botToken: "fake-token"
+  chatID: 987654
+  webhookURL: "https://example.com"
+webhooks:
+  - name: test-swt-webhook
+    pattern: test-swt
+    contentType: application/json
+    parseMode: html
+    verification:
+      type: swt
+      value: "my-swt-secret-key"
+    templates:
+      - template: "Secure Event: %s received! customer: %s"
+        keys:
+          - swt:event
+          - customer.name
+        trigger:
+          type: message
+          key: swt:event
+          value: payment.completed
+`
+	err := os.WriteFile(ConfigFile, []byte(cfgContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+	defer func() { _ = os.Remove(ConfigFile) }()
+
+	s, err := New()
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	payload := []byte(`{"customer":{"name":"Alice"}}`)
+	swtToken, err := generateSWTToken("payment.completed", payload, []byte("my-swt-secret-key"))
+	if err != nil {
+		t.Fatalf("failed to generate SWT token: %v", err)
+	}
+
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/webhooks/test-swt", bytes.NewBuffer(payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+swtToken)
+
+	s.mux.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d. Body: %s", recorder.Code, recorder.Body.String())
+	}
+
+	if !receivedTelegramRequest {
+		t.Error("expected Telegram API call, but none was received")
+	}
+
+	expectedMsg := "Secure Event: payment.completed received! customer: Alice"
+	if receivedMessageText != expectedMsg {
+		t.Errorf("expected message %q, got %q", expectedMsg, receivedMessageText)
 	}
 }

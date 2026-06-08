@@ -1,85 +1,122 @@
-# Webhook to Telegram message
+# whtt — Webhook to Telegram
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/sknr/webhook-to-telegram)](https://goreportcard.com/report/github.com/sknr/webhook-to-telegram)
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/sknr/webhook-to-telegram?style=flat)
-![GitHub Licence](https://img.shields.io/github/license/sknr/webhook-to-telegram)
+![GitHub License](https://img.shields.io/github/license/sknr/webhook-to-telegram)
+[![Sponsor me on GitHub](https://img.shields.io/badge/Sponsor%20me%20on%20GitHub-sknr-ea4aaa?style=for-the-badge&logo=github-sponsors)](https://github.com/sponsors/sknr)
 
-A Telegram bot which may handle webhook updates from several 
-services like GitHub, Kofi, PayPal, etc. and sends them as Telegram messages.
+**whtt** is a lightweight, high-performance, and secure Telegram bot server that forwards and formats webhook updates from services like GitHub, Ko-fi, PayPal, Stripe, and custom backends straight to your Telegram chats. 
 
-## Required steps
+**Zero coding required.** Simply write a YAML configuration, launch the binary, and start receiving beautiful, formatted alerts immediately.
 
-1. Create a Telegram bot via [BotFather](https://t.me/botfather) and obtain a bot token.
-2. Copy or rename `config_example.yml` to `config.yml` and configure to your desired webhook service needs. (see example below)
-3. Build cmd/main.go via `go build main.go -o whtt` and run the Telegram bot server.
+---
 
-## Example: config.yml
+## Why Choose whtt?
 
-In order to turn json data send via webhook to your Telegram bot into a message send to your Telegram account, you need to configure each service accordingly.
+*   🚀 **No Coding Needed**: Configure routes, verify headers, and parse multi-nested JSON payloads into human-readable Telegram alerts using only a simple `config.yml` file.
+*   🔒 **IETF Secure Webhook Token (SWT) Support**: Future-proof security built-in. Native support for the upcoming [IETF Secure Webhook Token draft standard](https://github.com/SecureWebhookToken/swt) (`draft-knauer-secure-webhook-token-02`) to cryptographically verify webhook signatures and guarantee request body integrity with SHA-256 or SHA-512 hashes.
+*   📝 **Rich Message Templates**: Support for `HTML`, `Markdown`, and `MarkdownV2` styling with automatic character escaping so your messages never break.
+*   ⚡ **Smart Trigger Filtering**: Route only the events you care about. Define custom triggers to execute specific templates when fields in the webhook JSON payload match your criteria (e.g. only notify on `"action": "created"`).
+*   📦 **Zero External Dependencies**: Compiled into a single, Go-native static binary with zero external runtime dependencies. Minimal memory footprint and instant startup.
+
+---
+
+## Quick Start in 3 Steps
+
+1.  **Create your Telegram Bot**: Message [@BotFather](https://t.me/botfather) on Telegram, create a new bot, and get your bot token.
+2.  **Configure**: Copy `config_example.yml` to `config.yml` and add your Telegram bot token, chat ID, and desired webhook rules.
+3.  **Run**:
+    ```bash
+    go build cmd/main.go -o whtt
+    ./whtt
+    ```
+
+---
+
+## Example `config.yml`
+
+Configure multiple incoming webhooks with custom verification methods (No validation, Header check, Message payload check, or Secure Webhook Tokens):
 
 ```yaml
 telegram:
-  chatID: %YOUR_TELEGRAM_CHAT_ID%
-  botToken: %YOUR_TELEGRAM_BOT_TOKEN%
-  webhookURL: https://%YOUR_OWN_TELEGRAM_BOT_DOMAIN%"
+  chatID: 987654321                         # Default Chat ID to receive messages
+  botToken: "123456789:ABCdefGhIJKlmNoPQ"   # Your Telegram Bot Token
+  webhookURL: "https://yourdomain.com/telegram-webhook"
 
 webhooks:
+  # 1. Ko-fi Webhook (x-www-form-urlencoded payload & simple verification token)
   - name: ko-fi.com
-    pattern: ko-fi # Will be added to your domain as /webhooks/ko-fi as the WebhookURL -> https://%YOUR_OWN_TELEGRAM_BOT_DOMAIN%/webhooks/ko-fi 
-    contentType: application/x-www-form-urlencoded # Can be either "application/x-www-form-urlencoded" or "application/json"
-    formKey: data # Name of the form field which contains the json data -> Required only for contentType: application/x-www-form-urlencoded
-    verification: # Here we validate the message and compare the key "verification_token" against the value we defined at ko-fi.com
+    pattern: ko-fi                          # Handled at: https://yourdomain.com/webhooks/ko-fi
+    contentType: application/x-www-form-urlencoded
+    formKey: data                           # Key containing the JSON body
+    verification:
       type: message
       key: verification_token
-      value: "abcd-11111-2222-3333-4444-5555"
+      value: "your-kofi-verification-token"
     templates:
-      - template: "Kofi-%s:\n\n%s (%s) donates %s %s to you!\n\nTimestamp: %s\nURL:%s\nMessage:\n%s"
+      - template: "☕ <b>Ko-fi Donation!</b>\n\n%s (%s) donated %s %s!\n\nMessage: <i>%s</i>"
         keys:
-          - type
           - from_name
           - email
           - amount
           - currency
-          - timestamp
-          - url
           - message
 
+  # 2. GitHub Stars Webhook (JSON payload, header verification & triggers)
   - name: github.com (Repository Stars)
-    pattern: github/stars # Will be added to your domain as /webhooks/github/stars as the WebhookURL -> https://%YOUR_OWN_TELEGRAM_BOT_DOMAIN%/webhooks/github/stars 
-    contentType: application/json # Can be either "application/x-www-form-urlencoded" or "application/json"
-    #telegramChatID: %YOUR_TELEGRAM_CHAT_ID% # You can overwrite the chatID if necessary.
-    verification: # Here we validate the http "X-GitHub-Hook-ID" header and compare against the id of our GitHub hook.
+    pattern: github/stars                   # Handled at: https://yourdomain.com/webhooks/github/stars
+    contentType: application/json
+    verification:
       type: header
       key: X-GitHub-Hook-ID
-      value: %THE_ID_OF_YOUR_GITHUB_HOOK%
+      value: "987654321"
     templates:
-      - template: "Github-Event: %s | Action: %s\n\nYour repository %q got a new star!\nIt has now %.f stars."
+      - template: "⭐ <b>GitHub Star Added!</b>\n\nRepository: <code>%s</code>\nTotal Stars: %.f"
         keys:
-          - header:X-GitHub-Event # Use "header:HTTP_HEADER_NAME" if you want to access the values from http header instead of the values from the message itself. 
-          - action
           - repository.name
           - repository.stargazers_count
-        trigger: # Optional: A key value pair which triggers this template (only messages with action=created trigger this template)
-          type: message # Take the value either from the message or from the header for comparing with value
+        trigger:
+          type: message
           key: action
           value: created
-
-      - template: "Github-Event: %s | Action: %s\n\nYour repository %q lost a star😢\nIt has now %.f stars."
+      - template: "💔 <b>GitHub Star Removed</b>\n\nRepository: <code>%s</code>\nTotal Stars: %.f"
         keys:
-          - header:X-GitHub-Event
-          - action
           - repository.name
           - repository.stargazers_count
-        trigger: # Optional: A key value pair which triggers this template (only messages with action=deleted trigger this template)
-          type: message # Take the value either from the message or from the header for comparing with value
+        trigger:
+          type: message
           key: action
           value: deleted
+
+  # 3. Secure Webhook Token (IETF SWT Draft standard)
+  - name: secure-service.com (SWT Verification)
+    pattern: secure-service                 # Handled at: https://yourdomain.com/webhooks/secure-service
+    contentType: application/json
+    verification:
+      type: swt
+      value: "my-shared-secret-key-used-for-signing-swt-token"
+    templates:
+      - template: "🔒 <b>Secure Event [%s]</b>\n\nPayment from %q was successful.\nRetry count: %v"
+        keys:
+          - swt:event                       # Access the verified SWT event claim
+          - customer.name
+          - swt:retry_count                 # Access the verified SWT retry count claim
+        trigger:
+          type: message
+          key: swt:event
+          value: payment.completed
 ```
 
-## General considerations
-Since there exists no "Webhook" standard yet and because I build this little project for myself and the only webhooks I currently use are the one from ko-fi.com and github.com, 
-probably not all available use cases for webhook messages will be supported "out-of-the-box". If you have a special case or need any help, create an issue and I try to help. 
-If you would like to contribute, I'll be happy to review your PR.
+---
+
+## General Considerations
+
+Since webhooks vary between services, we built a highly flexible parser. If your webhook service requires a special formatting scheme or verification type that is not yet supported, please feel free to open an issue or submit a pull request!
+
+---
 
 ## Support
-If you like the project and find it useful, I'd be grateful if you [sponsor me on GitHub](https://github.com/sponsors/sknr) 💖.
+
+If you like the project and find it useful, please consider sponsoring me on GitHub! Your support helps keep this tool maintained and secure.
+
+[![Sponsor me on GitHub](https://img.shields.io/badge/Sponsor%20me%20on%20GitHub-sknr-ea4aaa?style=for-the-badge&logo=github-sponsors)](https://github.com/sponsors/sknr)
