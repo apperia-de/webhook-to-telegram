@@ -26,10 +26,15 @@
 1.  **Create your Telegram Bot**: Message [@BotFather](https://t.me/botfather) on Telegram, create a new bot, and get your bot token.
 2.  **Configure**: Copy `config_example.yml` to `config.yml` and add your Telegram bot token, chat ID, and desired webhook rules.
 3.  **Run**:
-    ```bash
-    go build cmd/main.go -o whtt
-    ./whtt
-    ```
+    *   **Option A: Run locally**
+        ```bash
+        go build cmd/main.go -o whtt
+        ./whtt
+        ```
+    *   **Option B: Run with Docker Compose**
+        ```bash
+        docker compose up -d --build
+        ```
 
 ---
 
