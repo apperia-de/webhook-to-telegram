@@ -1,10 +1,9 @@
 # whtt — Webhook to Telegram
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/sknr/webhook-to-telegram)](https://goreportcard.com/report/github.com/sknr/webhook-to-telegram)
-![Coverage](assets/coverage-badge.svg)
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/sknr/webhook-to-telegram?style=flat)
 ![GitHub License](https://img.shields.io/github/license/sknr/webhook-to-telegram)
-[![Sponsor me on GitHub](https://img.shields.io/badge/Sponsor%20me%20on%20GitHub-sknr-ea4aaa?style=for-the-badge&logo=github-sponsors)](https://github.com/sponsors/sknr)
+[![Sponsor me on GitHub](https://img.shields.io/badge/Sponsor%20me%20on%20GitHub-sknr-ea4aaa?style=flat&logo=github-sponsors)](https://github.com/sponsors/sknr)
 
 **whtt** is a lightweight, high-performance, and secure Telegram bot server that forwards and formats webhook updates from services like GitHub, Ko-fi, PayPal, Stripe, and custom backends straight to your Telegram chats. 
 
@@ -68,14 +67,14 @@ webhooks:
           - currency
           - message
 
-  # 2. GitHub Stars Webhook (JSON payload, header verification & triggers)
+  # 2. GitHub Stars Webhook (JSON payload, HMAC-SHA256 verification & triggers)
   - name: github.com (Repository Stars)
     pattern: github/stars                   # Handled at: https://yourdomain.com/webhooks/github/stars
     contentType: application/json
     verification:
-      type: header
-      key: X-GitHub-Hook-ID
-      value: "987654321"
+      type: hmac-sha256
+      key: X-Hub-Signature-256
+      value: "your-github-webhook-secret-token"
     templates:
       - template: "⭐ <b>GitHub Star Added!</b>\n\nRepository: <code>%s</code>\nTotal Stars: %.f"
         keys:
@@ -145,12 +144,18 @@ Define a list of incoming endpoints. Each entry supports the following fields:
 | `templates` | Array | | Formatting and routing rules for generating the Telegram alerts. |
 
 #### Webhook Authentication (`verification`)
-Prevent unauthorized request forwarding using one of the following methods:
-*   `type: none` — No signature verification or validation is performed.
-*   `type: header` — Compares the value of a specific HTTP request header against your configured `value`.
-    *   *Example:* Compare `X-GitHub-Hook-ID` header.
-*   `type: message` — Compares a JSON key/field value inside the webhook payload against your configured `value`.
-*   `type: swt` — Future-proof IETF Secure Webhook Token signature verification using HMAC-SHA256 and body integrity hashing. The `value` is the shared secret.
+Prevent unauthorized request forwarding using one of the following authentication methods configured via the `verification` object:
+
+| `type` | Description |
+| :--- | :--- |
+| `none` | No signature verification or validation is performed. |
+| `header` | Compares the value of the HTTP request header specified in `key` against the configured `value` (e.g. `key: X-GitHub-Hook-ID`). |
+| `message` | Compares the value of a JSON key/field in the payload (specified in `key`) against the configured `value`. |
+| `hmac-sha256` | HMAC-SHA256 signature verification. Automatically trims the `sha256=` prefix (useful for GitHub/Gitea). The `key` is the header name, and the `value` is the shared secret. |
+| `hmac-sha1` | HMAC-SHA1 signature verification. Automatically trims the `sha1=` prefix. The `key` is the header name, and the `value` is the shared secret. |
+| `hmac-sha256-base64` | HMAC-SHA256 signature verification with base64-encoded signature (useful for Shopify). The `key` is the header name, and the `value` is the shared secret. |
+| `hmac-sha1-base64` | HMAC-SHA1 signature verification with base64-encoded signature. The `key` is the header name, and the `value` is the shared secret. |
+| `swt` | Future-proof IETF Secure Webhook Token signature verification using HMAC-SHA256 and body integrity hashing. The `value` is the shared secret. |
 
 ---
 

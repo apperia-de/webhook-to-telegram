@@ -14,7 +14,7 @@ COPY . ./
 RUN CGO_ENABLED=0 GOOS=linux go build -o /app/whtt cmd/main.go
 
 # Deploy the application binary into a lean image
-#FROM gcr.io/distroless/base-debian12 AS build-release-stage
+#FROM gcr.io/distroless/base-debian13 AS build-release-stage
 FROM gcr.io/distroless/static-debian13 AS build-release-stage
 
 WORKDIR /

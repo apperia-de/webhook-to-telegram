@@ -2,9 +2,15 @@ package server
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash"
 	"io"
 	"log"
 	"net/http"
@@ -26,12 +32,17 @@ const (
 	HeaderFormURLEncoded = "application/x-www-form-urlencoded"
 	HeaderJSON           = "application/json"
 
-	TypeNone    = "none"
-	TypeHeader  = "header"
-	TypeMessage = "message"
+	TypeNone             = "none"
+	TypeHeader           = "header"
+	TypeMessage          = "message"
+	TypeHMACSHA256       = "hmac-sha256"
+	TypeHMACSHA1         = "hmac-sha1"
+	TypeHMACSHA256Base64 = "hmac-sha256-base64"
+	TypeHMACSHA1Base64   = "hmac-sha1-base64"
 )
 
 type contextKey string
+
 const swtClaimsKey contextKey = "swtClaims"
 
 var (
@@ -363,10 +374,54 @@ func (s *WebhookServer) isValid(wh *Webhook, r **http.Request, msg map[string]an
 		}
 		*r = (*r).WithContext(context.WithValue((*r).Context(), swtClaimsKey, claims))
 		return true
+	case TypeHMACSHA256, TypeHMACSHA1, TypeHMACSHA256Base64, TypeHMACSHA1Base64:
+		return s.verifyHMAC(wh, *r, body)
 	default:
 		return false
 	}
 	return subtle.ConstantTimeCompare([]byte(val), []byte(wh.Verification.Value)) == 1
+}
+
+func (s *WebhookServer) verifyHMAC(wh *Webhook, r *http.Request, body []byte) bool {
+	sigStr := r.Header.Get(wh.Verification.Key)
+	if sigStr == "" {
+		return false
+	}
+
+	// Strip optional prefix (e.g. "sha256=" or "sha1=")
+	if strings.HasPrefix(sigStr, "sha256=") {
+		sigStr = strings.TrimPrefix(sigStr, "sha256=")
+	} else if strings.HasPrefix(sigStr, "sha1=") {
+		sigStr = strings.TrimPrefix(sigStr, "sha1=")
+	}
+
+	var sig []byte
+	var err error
+	switch wh.Verification.Type {
+	case TypeHMACSHA256, TypeHMACSHA1:
+		sig, err = hex.DecodeString(sigStr)
+	case TypeHMACSHA256Base64, TypeHMACSHA1Base64:
+		sig, err = base64.StdEncoding.DecodeString(sigStr)
+	}
+	if err != nil {
+		log.Printf("Failed to decode signature: %v", err)
+		return false
+	}
+
+	var mac hash.Hash
+	switch wh.Verification.Type {
+	case TypeHMACSHA256, TypeHMACSHA256Base64:
+		mac = hmac.New(sha256.New, []byte(wh.Verification.Value))
+	case TypeHMACSHA1, TypeHMACSHA1Base64:
+		mac = hmac.New(sha1.New, []byte(wh.Verification.Value))
+	default:
+		return false
+	}
+
+	mac.Write(body)
+	expectedMac := mac.Sum(nil)
+
+	return subtle.ConstantTimeCompare(sig, expectedMac) == 1
 }
 
 func getValue(key string, msg map[string]any, r *http.Request) any {

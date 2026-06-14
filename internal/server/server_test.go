@@ -3,8 +3,10 @@ package server
 import (
 	"bytes"
 	"crypto/hmac"
+	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -161,6 +163,44 @@ func TestIsValid(t *testing.T) {
 	reqSWT := httptest.NewRequest("POST", "/webhooks/test", bytes.NewBuffer(bodyBytes))
 	reqSWT.Header.Set("Authorization", "Bearer "+swtToken)
 
+	// For HMAC tests
+	hmacSecret := "my-secret-key"
+	hmacBody := []byte(`{"status":"ok"}`)
+
+	// HMAC-SHA256 hex
+	mac256 := hmac.New(sha256.New, []byte(hmacSecret))
+	mac256.Write(hmacBody)
+	sig256Hex := hex.EncodeToString(mac256.Sum(nil))
+
+	reqHMAC256 := httptest.NewRequest("POST", "/webhooks/test", bytes.NewBuffer(hmacBody))
+	reqHMAC256.Header.Set("X-Hub-Signature-256", "sha256="+sig256Hex)
+
+	reqHMAC256NoPrefix := httptest.NewRequest("POST", "/webhooks/test", bytes.NewBuffer(hmacBody))
+	reqHMAC256NoPrefix.Header.Set("X-Gitea-Signature", sig256Hex)
+
+	// HMAC-SHA256 base64
+	sig256Base64 := base64.StdEncoding.EncodeToString(mac256.Sum(nil))
+	reqHMAC256Base64 := httptest.NewRequest("POST", "/webhooks/test", bytes.NewBuffer(hmacBody))
+	reqHMAC256Base64.Header.Set("X-Shopify-Hmac-SHA256", sig256Base64)
+
+	// HMAC-SHA1 hex
+	mac1 := hmac.New(sha1.New, []byte(hmacSecret))
+	mac1.Write(hmacBody)
+	sig1Hex := hex.EncodeToString(mac1.Sum(nil))
+	reqHMAC1 := httptest.NewRequest("POST", "/webhooks/test", bytes.NewBuffer(hmacBody))
+	reqHMAC1.Header.Set("X-Hub-Signature", "sha1="+sig1Hex)
+
+	// HMAC-SHA1 base64
+	sig1Base64 := base64.StdEncoding.EncodeToString(mac1.Sum(nil))
+	reqHMAC1Base64 := httptest.NewRequest("POST", "/webhooks/test", bytes.NewBuffer(hmacBody))
+	reqHMAC1Base64.Header.Set("X-Signature", sig1Base64)
+
+	// Mismatched / Bad HMAC requests
+	reqHMACBadSig := httptest.NewRequest("POST", "/webhooks/test", bytes.NewBuffer(hmacBody))
+	reqHMACBadSig.Header.Set("X-Hub-Signature-256", "sha256=9999999999999999999999999999999999999999999999999999999999999999")
+
+	reqHMACMissingHeader := httptest.NewRequest("POST", "/webhooks/test", bytes.NewBuffer(hmacBody))
+
 	tests := []struct {
 		name      string
 		webhook   *Webhook
@@ -246,6 +286,110 @@ func TestIsValid(t *testing.T) {
 			},
 			req:       reqSWT,
 			bodyBytes: bodyBytes,
+			expected:  false,
+		},
+		{
+			name: "HMAC-SHA256 Hex Match",
+			webhook: &Webhook{
+				Verification: ValidationType{
+					Type:  TypeHMACSHA256,
+					Key:   "X-Hub-Signature-256",
+					Value: hmacSecret,
+				},
+			},
+			req:       reqHMAC256,
+			bodyBytes: hmacBody,
+			expected:  true,
+		},
+		{
+			name: "HMAC-SHA256 Hex Match No Prefix",
+			webhook: &Webhook{
+				Verification: ValidationType{
+					Type:  TypeHMACSHA256,
+					Key:   "X-Gitea-Signature",
+					Value: hmacSecret,
+				},
+			},
+			req:       reqHMAC256NoPrefix,
+			bodyBytes: hmacBody,
+			expected:  true,
+		},
+		{
+			name: "HMAC-SHA256 Base64 Match",
+			webhook: &Webhook{
+				Verification: ValidationType{
+					Type:  TypeHMACSHA256Base64,
+					Key:   "X-Shopify-Hmac-SHA256",
+					Value: hmacSecret,
+				},
+			},
+			req:       reqHMAC256Base64,
+			bodyBytes: hmacBody,
+			expected:  true,
+		},
+		{
+			name: "HMAC-SHA1 Hex Match",
+			webhook: &Webhook{
+				Verification: ValidationType{
+					Type:  TypeHMACSHA1,
+					Key:   "X-Hub-Signature",
+					Value: hmacSecret,
+				},
+			},
+			req:       reqHMAC1,
+			bodyBytes: hmacBody,
+			expected:  true,
+		},
+		{
+			name: "HMAC-SHA1 Base64 Match",
+			webhook: &Webhook{
+				Verification: ValidationType{
+					Type:  TypeHMACSHA1Base64,
+					Key:   "X-Signature",
+					Value: hmacSecret,
+				},
+			},
+			req:       reqHMAC1Base64,
+			bodyBytes: hmacBody,
+			expected:  true,
+		},
+		{
+			name: "HMAC Mismatch Signature",
+			webhook: &Webhook{
+				Verification: ValidationType{
+					Type:  TypeHMACSHA256,
+					Key:   "X-Hub-Signature-256",
+					Value: hmacSecret,
+				},
+			},
+			req:       reqHMACBadSig,
+			bodyBytes: hmacBody,
+			expected:  false,
+		},
+		{
+			name: "HMAC Missing Signature Header",
+			webhook: &Webhook{
+				Verification: ValidationType{
+					Type:  TypeHMACSHA256,
+					Key:   "X-Hub-Signature-256",
+					Value: hmacSecret,
+				},
+			},
+			req:       reqHMACMissingHeader,
+			bodyBytes: hmacBody,
+			expected:  false,
+		},
+		{
+			name: "HMAC Mismatch Secret",
+			webhook: &Webhook{
+				Verification: ValidationType{
+					Type:  TypeHMACSHA256,
+					Key:   "X-Hub-Signature-256",
+					Value: "different-secret",
+				},
+			},
+			req:       reqHMAC256,
+			bodyBytes: hmacBody,
 			expected:  false,
 		},
 		{
