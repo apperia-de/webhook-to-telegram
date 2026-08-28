@@ -16,14 +16,16 @@ func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func TestSendMessage(t *testing.T) {
+	threadID := int64(454)
 	tests := []struct {
-		name        string
-		chatID      int64
-		text        string
-		parseMode   ParseMode
-		mockStatus  int
-		mockBody    string
-		expectError bool
+		name            string
+		chatID          int64
+		messageThreadID *int64
+		text            string
+		parseMode       ParseMode
+		mockStatus      int
+		mockBody        string
+		expectError     bool
 	}{
 		{
 			name:        "Success with HTML",
@@ -33,6 +35,16 @@ func TestSendMessage(t *testing.T) {
 			mockStatus:  http.StatusOK,
 			mockBody:    `{"ok": true}`,
 			expectError: false,
+		},
+		{
+			name:            "Success with MessageThreadID",
+			chatID:          12345,
+			messageThreadID: &threadID,
+			text:            "Hello Topic",
+			parseMode:       HTML,
+			mockStatus:      http.StatusOK,
+			mockBody:        `{"ok": true}`,
+			expectError:     false,
 		},
 		{
 			name:        "Success without ParseMode",
@@ -91,6 +103,15 @@ func TestSendMessage(t *testing.T) {
 				if payload["text"].(string) != tt.text {
 					return nil, fmt.Errorf("unexpected text: %s", payload["text"])
 				}
+				if tt.messageThreadID != nil {
+					if int64(payload["message_thread_id"].(float64)) != *tt.messageThreadID {
+						return nil, fmt.Errorf("unexpected message_thread_id: %v", payload["message_thread_id"])
+					}
+				} else {
+					if _, ok := payload["message_thread_id"]; ok {
+						return nil, fmt.Errorf("message_thread_id should not be set")
+					}
+				}
 				if tt.parseMode != "" {
 					if payload["parse_mode"].(string) != string(tt.parseMode) {
 						return nil, fmt.Errorf("unexpected parse_mode: %v", payload["parse_mode"])
@@ -109,7 +130,7 @@ func TestSendMessage(t *testing.T) {
 				return resp, nil
 			})
 
-			err := client.SendMessage(tt.chatID, tt.text, tt.parseMode)
+			err := client.SendMessage(tt.chatID, tt.messageThreadID, tt.text, tt.parseMode)
 			if (err != nil) != tt.expectError {
 				t.Errorf("SendMessage() error = %v, expectError = %v", err, tt.expectError)
 			}

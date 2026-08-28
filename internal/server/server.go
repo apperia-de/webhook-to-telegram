@@ -61,20 +61,22 @@ type Config struct {
 }
 
 type Webhook struct {
-	Name           string             `yaml:"name"`
-	Pattern        string             `yaml:"pattern"`
-	ContentType    string             `yaml:"contentType"`
-	FormKey        string             `yaml:"formKey"`
-	ParseMode      telegram.ParseMode `yaml:"parseMode"`
-	TelegramChatID *int64             `yaml:"telegramChatID,omitempty"`
-	Verification   ValidationType     `yaml:"verification"`
-	Templates      []*Template        `yaml:"templates,omitempty"`
+	Name                    string             `yaml:"name"`
+	Pattern                 string             `yaml:"pattern"`
+	ContentType             string             `yaml:"contentType"`
+	FormKey                 string             `yaml:"formKey"`
+	ParseMode               telegram.ParseMode `yaml:"parseMode"`
+	TelegramChatID          *int64             `yaml:"telegramChatID,omitempty"`
+	TelegramMessageThreadID *int64             `yaml:"telegramMessageThreadID,omitempty"`
+	Verification            ValidationType     `yaml:"verification"`
+	Templates               []*Template        `yaml:"templates,omitempty"`
 }
 
 type Telegram struct {
-	BotToken   string `yaml:"botToken"`
-	ChatID     *int64 `yaml:"chatID"`
-	WebhookURL string `yaml:"webhookURL"`
+	BotToken        string `yaml:"botToken"`
+	ChatID          *int64 `yaml:"chatID"`
+	MessageThreadID *int64 `yaml:"messageThreadID"`
+	WebhookURL      string `yaml:"webhookURL"`
 }
 
 type Template struct {
@@ -154,7 +156,7 @@ func (s *WebhookServer) Start() {
 		if update.Message != nil && update.Message.Text == "/id" {
 			chatID := update.Message.Chat.ID
 			msgText := fmt.Sprintf("Your ChatID is: %d", chatID)
-			if err := s.api.SendMessage(chatID, msgText, ""); err != nil {
+			if err := s.api.SendMessage(chatID, nil, msgText, ""); err != nil {
 				log.Println("failed to send /id response message:", err)
 			}
 		}
@@ -302,7 +304,7 @@ func (s *WebhookServer) createWebhookHandlers(webhooks []*Webhook) {
 
 			text := fmt.Sprintf(t.Template, values...)
 
-			err = s.api.SendMessage(s.getChatID(wh), text, wh.ParseMode)
+			err = s.api.SendMessage(s.getChatID(wh), s.getMessageThreadID(wh), text, wh.ParseMode)
 			if err != nil {
 				log.Println("cannot send telegram message:", err)
 				w.WriteHeader(http.StatusBadGateway)
@@ -469,6 +471,13 @@ func (s *WebhookServer) getChatID(wh *Webhook) int64 {
 		return *s.config.Telegram.ChatID
 	}
 	return *wh.TelegramChatID
+}
+
+func (s *WebhookServer) getMessageThreadID(wh *Webhook) *int64 {
+	if wh.TelegramMessageThreadID == nil {
+		return s.config.Telegram.MessageThreadID
+	}
+	return wh.TelegramMessageThreadID
 }
 
 // EscapeText takes an input text and escape Telegram markup symbols.

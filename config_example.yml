@@ -1,5 +1,6 @@
 telegram:
   chatID: %YOUR_TELEGRAM_CHAT_ID%
+  #messageThreadID: %YOUR_TELEGRAM_MESSAGE_THREAD_ID% # Optional: default topic/thread ID for forum groups.
   botToken: %YOUR_TELEGRAM_BOT_TOKEN%
   webhookURL: https://%YOUR_OWN_TELEGRAM_BOT_DOMAIN%"
 
@@ -28,6 +29,7 @@ webhooks:
     pattern: github/stars # Will be added to your domain as /webhooks/github/stars as the WebhookURL -> https://%YOUR_OWN_TELEGRAM_BOT_DOMAIN%/webhooks/github/stars
     contentType: application/json # Can be either "application/x-www-form-urlencoded" or "application/json"
     #telegramChatID: %YOUR_TELEGRAM_CHAT_ID% # You can overwrite the chatID if necessary.
+    #telegramMessageThreadID: %YOUR_TELEGRAM_MESSAGE_THREAD_ID% # You can overwrite the messageThreadID if necessary.
     verification: # Here we validate the http "X-GitHub-Hook-ID" header and compare against the id of our GitHub hook.
       type: header
       key: X-GitHub-Hook-ID
