@@ -54,10 +54,13 @@ func CustomClient(baseURL, botToken string) *Client {
 	}
 }
 
-func (c *Client) SendMessage(chatID int64, text string, parseMode ParseMode) error {
+func (c *Client) SendMessage(chatID int64, messageThreadID *int64, text string, parseMode ParseMode) error {
 	payload := map[string]any{
 		"chat_id": chatID,
 		"text":    text,
+	}
+	if messageThreadID != nil {
+		payload["message_thread_id"] = *messageThreadID
 	}
 	if parseMode != "" {
 		payload["parse_mode"] = string(parseMode)
