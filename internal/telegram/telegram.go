@@ -6,7 +6,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
+
+// maxSendAttempts limits how often a rate limited (HTTP 429) sendMessage
+// call is retried before giving up.
+const maxSendAttempts = 5
 
 type ParseMode string
 
@@ -71,18 +76,40 @@ func (c *Client) SendMessage(chatID int64, messageThreadID *int64, text string, 
 		return err
 	}
 
-	resp, err := c.hc.Post(c.apiURL+"/sendMessage", "application/json", bytes.NewBuffer(data))
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
+	for attempt := 1; ; attempt++ {
+		resp, err := c.hc.Post(c.apiURL+"/sendMessage", "application/json", bytes.NewReader(data))
+		if err != nil {
+			return err
+		}
 		body, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+
+		if resp.StatusCode == http.StatusOK {
+			return nil
+		}
+
+		// Rate limited: wait for the duration Telegram tells us and try again.
+		if resp.StatusCode == http.StatusTooManyRequests && attempt < maxSendAttempts {
+			time.Sleep(retryAfter(body))
+			continue
+		}
+
 		return fmt.Errorf("telegram API returned status %d: %s", resp.StatusCode, string(body))
 	}
+}
 
-	return nil
+// retryAfter extracts the retry_after duration from a 429 response body,
+// falling back to one second when it cannot be parsed.
+func retryAfter(body []byte) time.Duration {
+	var apiErr struct {
+		Parameters struct {
+			RetryAfter int `json:"retry_after"`
+		} `json:"parameters"`
+	}
+	if err := json.Unmarshal(body, &apiErr); err == nil && apiErr.Parameters.RetryAfter > 0 {
+		return time.Duration(apiErr.Parameters.RetryAfter) * time.Second
+	}
+	return time.Second
 }
 
 func (c *Client) SetWebhook(webhookURL string) error {

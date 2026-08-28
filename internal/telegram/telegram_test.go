@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"testing"
+	"time"
 )
 
 type roundTripperFunc func(*http.Request) (*http.Response, error)
@@ -135,6 +136,46 @@ func TestSendMessage(t *testing.T) {
 				t.Errorf("SendMessage() error = %v, expectError = %v", err, tt.expectError)
 			}
 		})
+	}
+}
+
+func TestSendMessageRetriesOn429(t *testing.T) {
+	client := CustomClient("http://mock-telegram", "fake-token")
+
+	var requests int
+	client.hc.Transport = roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		requests++
+		if requests == 1 {
+			return &http.Response{
+				StatusCode: http.StatusTooManyRequests,
+				Body:       io.NopCloser(bytes.NewBufferString(`{"ok": false, "error_code": 429, "description": "Too Many Requests: retry after 1", "parameters": {"retry_after": 1}}`)),
+				Header:     make(http.Header),
+			}, nil
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(bytes.NewBufferString(`{"ok": true}`)),
+			Header:     make(http.Header),
+		}, nil
+	})
+
+	if err := client.SendMessage(12345, nil, "Hello Retry", ""); err != nil {
+		t.Errorf("SendMessage() should succeed after retry, got error: %v", err)
+	}
+	if requests != 2 {
+		t.Errorf("expected 2 requests (429 then 200), got %d", requests)
+	}
+}
+
+func TestRetryAfter(t *testing.T) {
+	if got := retryAfter([]byte(`{"parameters": {"retry_after": 5}}`)); got != 5*time.Second {
+		t.Errorf("expected 5s, got %v", got)
+	}
+	if got := retryAfter([]byte(`not-json`)); got != time.Second {
+		t.Errorf("expected 1s fallback, got %v", got)
+	}
+	if got := retryAfter([]byte(`{"ok": false}`)); got != time.Second {
+		t.Errorf("expected 1s fallback, got %v", got)
 	}
 }
 

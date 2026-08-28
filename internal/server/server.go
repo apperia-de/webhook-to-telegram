@@ -29,6 +29,13 @@ const (
 
 	DefaultFormKey = "payload"
 
+	// sendQueueSize bounds how many outgoing messages may be waiting for
+	// delivery before new webhook events are rejected.
+	sendQueueSize = 1024
+	// perChatSendInterval paces messages to the same chat, keeping us below
+	// Telegram's rate limit of ~20 messages per minute per group.
+	perChatSendInterval = 3 * time.Second
+
 	HeaderFormURLEncoded = "application/x-www-form-urlencoded"
 	HeaderJSON           = "application/json"
 
@@ -102,6 +109,15 @@ type WebhookServer struct {
 	mux        *http.ServeMux
 	config     *Config
 	api        *telegram.Client
+	sendQueue  chan sendRequest
+}
+
+// sendRequest is a queued outgoing Telegram message.
+type sendRequest struct {
+	chatID          int64
+	messageThreadID *int64
+	text            string
+	parseMode       telegram.ParseMode
 }
 
 func New() (*WebhookServer, error) {
@@ -113,12 +129,33 @@ func New() (*WebhookServer, error) {
 		httpServer: httpServer,
 		mux:        mux,
 		config:     &Config{},
+		sendQueue:  make(chan sendRequest, sendQueueSize),
 	}
 
 	if err := s.initialize(); err != nil {
 		return nil, err
 	}
+
+	go s.processSendQueue()
+
 	return s, nil
+}
+
+// processSendQueue serializes all outgoing Telegram messages so that bursts of
+// webhook events are spread out instead of being dropped by Telegram's rate
+// limit, and paces messages per chat. SendMessage additionally honors the
+// retry_after duration on HTTP 429 responses.
+func (s *WebhookServer) processSendQueue() {
+	lastSent := make(map[int64]time.Time)
+	for req := range s.sendQueue {
+		if wait := perChatSendInterval - time.Since(lastSent[req.chatID]); wait > 0 {
+			time.Sleep(wait)
+		}
+		if err := s.api.SendMessage(req.chatID, req.messageThreadID, req.text, req.parseMode); err != nil {
+			log.Println("cannot send telegram message:", err)
+		}
+		lastSent[req.chatID] = time.Now()
+	}
 }
 
 func (s *WebhookServer) GetHttpServer() *http.Server {
@@ -304,10 +341,18 @@ func (s *WebhookServer) createWebhookHandlers(webhooks []*Webhook) {
 
 			text := fmt.Sprintf(t.Template, values...)
 
-			err = s.api.SendMessage(s.getChatID(wh), s.getMessageThreadID(wh), text, wh.ParseMode)
-			if err != nil {
-				log.Println("cannot send telegram message:", err)
-				w.WriteHeader(http.StatusBadGateway)
+			// Queue the message for delivery instead of sending it inline, so
+			// slow or rate limited Telegram calls never block webhook responses.
+			select {
+			case s.sendQueue <- sendRequest{
+				chatID:          s.getChatID(wh),
+				messageThreadID: s.getMessageThreadID(wh),
+				text:            text,
+				parseMode:       wh.ParseMode,
+			}:
+			default:
+				log.Println("send queue full, dropping telegram message")
+				w.WriteHeader(http.StatusServiceUnavailable)
 				return
 			}
 

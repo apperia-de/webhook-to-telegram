@@ -15,6 +15,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sknr/webhook-to-telegram/internal/telegram"
 )
@@ -484,11 +485,14 @@ func TestWebhookHandlerSuccess(t *testing.T) {
 	oldTransport := http.DefaultTransport
 	defer func() { http.DefaultTransport = oldTransport }()
 
-	var receivedTelegramRequest bool
+	telegramCalled := make(chan struct{}, 1)
 
 	http.DefaultTransport = roundTripperFunc(func(req *http.Request) (*http.Response, error) {
 		if req.URL.Host == "api.telegram.org" && strings.Contains(req.URL.Path, "/botfake-token/sendMessage") {
-			receivedTelegramRequest = true
+			select {
+			case telegramCalled <- struct{}{}:
+			default:
+			}
 			resp := &http.Response{
 				StatusCode: http.StatusOK,
 				Header:     make(http.Header),
@@ -548,7 +552,10 @@ webhooks:
 		t.Errorf("expected status 200, got %d. Body: %s", recorder.Code, recorder.Body.String())
 	}
 
-	if !receivedTelegramRequest {
+	// Messages are delivered asynchronously via the send queue.
+	select {
+	case <-telegramCalled:
+	case <-time.After(2 * time.Second):
 		t.Error("expected Telegram API call, but none was received")
 	}
 }
@@ -557,16 +564,16 @@ func TestWebhookHandlerSWT(t *testing.T) {
 	oldTransport := http.DefaultTransport
 	defer func() { http.DefaultTransport = oldTransport }()
 
-	var receivedTelegramRequest bool
-	var receivedMessageText string
+	telegramText := make(chan string, 1)
 
 	http.DefaultTransport = roundTripperFunc(func(req *http.Request) (*http.Response, error) {
 		if req.URL.Host == "api.telegram.org" && strings.Contains(req.URL.Path, "/botfake-token/sendMessage") {
-			receivedTelegramRequest = true
-
 			var payload map[string]any
 			_ = json.NewDecoder(req.Body).Decode(&payload)
-			receivedMessageText = payload["text"].(string)
+			select {
+			case telegramText <- payload["text"].(string):
+			default:
+			}
 
 			resp := &http.Response{
 				StatusCode: http.StatusOK,
@@ -639,12 +646,14 @@ webhooks:
 		t.Errorf("expected status 200, got %d. Body: %s", recorder.Code, recorder.Body.String())
 	}
 
-	if !receivedTelegramRequest {
-		t.Error("expected Telegram API call, but none was received")
-	}
-
+	// Messages are delivered asynchronously via the send queue.
 	expectedMsg := "Secure Event: payment.completed received! customer: Alice"
-	if receivedMessageText != expectedMsg {
-		t.Errorf("expected message %q, got %q", expectedMsg, receivedMessageText)
+	select {
+	case receivedMessageText := <-telegramText:
+		if receivedMessageText != expectedMsg {
+			t.Errorf("expected message %q, got %q", expectedMsg, receivedMessageText)
+		}
+	case <-time.After(2 * time.Second):
+		t.Error("expected Telegram API call, but none was received")
 	}
 }
