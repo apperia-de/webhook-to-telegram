@@ -1,6 +1,7 @@
 telegram:
   chatID: %YOUR_TELEGRAM_CHAT_ID%
   #messageThreadID: %YOUR_TELEGRAM_MESSAGE_THREAD_ID% # Optional: default topic/thread ID for forum groups.
+  #disableLinkPreview: true # Optional: disable link previews for all outgoing messages.
   botToken: %YOUR_TELEGRAM_BOT_TOKEN%
   webhookURL: https://%YOUR_OWN_TELEGRAM_BOT_DOMAIN%"
 
@@ -30,6 +31,7 @@ webhooks:
     contentType: application/json # Can be either "application/x-www-form-urlencoded" or "application/json"
     #telegramChatID: %YOUR_TELEGRAM_CHAT_ID% # You can overwrite the chatID if necessary.
     #telegramMessageThreadID: %YOUR_TELEGRAM_MESSAGE_THREAD_ID% # You can overwrite the messageThreadID if necessary.
+    #telegramDisableLinkPreview: true # You can overwrite the global disableLinkPreview if necessary.
     verification: # Here we validate the http "X-GitHub-Hook-ID" header and compare against the id of our GitHub hook.
       type: header
       key: X-GitHub-Hook-ID
