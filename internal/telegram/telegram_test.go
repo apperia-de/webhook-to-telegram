@@ -19,50 +19,55 @@ func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 func TestSendMessage(t *testing.T) {
 	threadID := int64(454)
 	tests := []struct {
-		name               string
-		chatID             int64
-		messageThreadID    *int64
-		disableLinkPreview bool
-		text               string
-		parseMode          ParseMode
-		mockStatus         int
-		mockBody           string
-		expectError        bool
+		name        string
+		chatID      int64
+		text        string
+		opts        *SendMessageOptions
+		mockStatus  int
+		mockBody    string
+		expectError bool
 	}{
 		{
 			name:        "Success with HTML",
 			chatID:      12345,
 			text:        "Hello HTML",
-			parseMode:   HTML,
+			opts:        &SendMessageOptions{ParseMode: HTML},
 			mockStatus:  http.StatusOK,
 			mockBody:    `{"ok": true}`,
 			expectError: false,
 		},
 		{
-			name:               "Success with DisableLinkPreview",
-			chatID:             12345,
-			disableLinkPreview: true,
-			text:               "Hello NoPreview",
-			parseMode:          HTML,
-			mockStatus:         http.StatusOK,
-			mockBody:           `{"ok": true}`,
-			expectError:        false,
+			name:        "Success with DisableLinkPreview",
+			chatID:      12345,
+			text:        "Hello NoPreview",
+			opts:        &SendMessageOptions{ParseMode: HTML, DisableLinkPreview: true},
+			mockStatus:  http.StatusOK,
+			mockBody:    `{"ok": true}`,
+			expectError: false,
 		},
 		{
-			name:            "Success with MessageThreadID",
-			chatID:          12345,
-			messageThreadID: &threadID,
-			text:            "Hello Topic",
-			parseMode:       HTML,
-			mockStatus:      http.StatusOK,
-			mockBody:        `{"ok": true}`,
-			expectError:     false,
+			name:        "Success with MessageThreadID",
+			chatID:      12345,
+			text:        "Hello Topic",
+			opts:        &SendMessageOptions{ParseMode: HTML, MessageThreadID: &threadID},
+			mockStatus:  http.StatusOK,
+			mockBody:    `{"ok": true}`,
+			expectError: false,
 		},
 		{
-			name:        "Success without ParseMode",
+			name:        "Success with DisableNotification and ProtectContent",
+			chatID:      12345,
+			text:        "Hello Silent Protected",
+			opts:        &SendMessageOptions{DisableNotification: true, ProtectContent: true},
+			mockStatus:  http.StatusOK,
+			mockBody:    `{"ok": true}`,
+			expectError: false,
+		},
+		{
+			name:        "Success without options (nil)",
 			chatID:      12345,
 			text:        "Hello Plain",
-			parseMode:   "",
+			opts:        nil,
 			mockStatus:  http.StatusOK,
 			mockBody:    `{"ok": true}`,
 			expectError: false,
@@ -71,7 +76,7 @@ func TestSendMessage(t *testing.T) {
 			name:        "Success with MarkdownV2",
 			chatID:      12345,
 			text:        "Hello MarkdownV2",
-			parseMode:   MarkdownV2,
+			opts:        &SendMessageOptions{ParseMode: MarkdownV2},
 			mockStatus:  http.StatusOK,
 			mockBody:    `{"ok": true}`,
 			expectError: false,
@@ -80,7 +85,7 @@ func TestSendMessage(t *testing.T) {
 			name:        "API Error Response",
 			chatID:      12345,
 			text:        "Hello Bad",
-			parseMode:   "",
+			opts:        nil,
 			mockStatus:  http.StatusBadRequest,
 			mockBody:    `{"ok": false, "description": "Bad Request"}`,
 			expectError: true,
@@ -115,7 +120,8 @@ func TestSendMessage(t *testing.T) {
 				if payload["text"].(string) != tt.text {
 					return nil, fmt.Errorf("unexpected text: %s", payload["text"])
 				}
-				if tt.disableLinkPreview {
+
+				if tt.opts != nil && tt.opts.DisableLinkPreview {
 					opts, ok := payload["link_preview_options"].(map[string]any)
 					if !ok || opts["is_disabled"] != true {
 						return nil, fmt.Errorf("unexpected link_preview_options: %v", payload["link_preview_options"])
@@ -125,8 +131,29 @@ func TestSendMessage(t *testing.T) {
 						return nil, fmt.Errorf("link_preview_options should not be set")
 					}
 				}
-				if tt.messageThreadID != nil {
-					if int64(payload["message_thread_id"].(float64)) != *tt.messageThreadID {
+
+				if tt.opts != nil && tt.opts.DisableNotification {
+					if disabled, ok := payload["disable_notification"].(bool); !ok || !disabled {
+						return nil, fmt.Errorf("unexpected disable_notification: %v", payload["disable_notification"])
+					}
+				} else {
+					if _, ok := payload["disable_notification"]; ok {
+						return nil, fmt.Errorf("disable_notification should not be set")
+					}
+				}
+
+				if tt.opts != nil && tt.opts.ProtectContent {
+					if protect, ok := payload["protect_content"].(bool); !ok || !protect {
+						return nil, fmt.Errorf("unexpected protect_content: %v", payload["protect_content"])
+					}
+				} else {
+					if _, ok := payload["protect_content"]; ok {
+						return nil, fmt.Errorf("protect_content should not be set")
+					}
+				}
+
+				if tt.opts != nil && tt.opts.MessageThreadID != nil {
+					if int64(payload["message_thread_id"].(float64)) != *tt.opts.MessageThreadID {
 						return nil, fmt.Errorf("unexpected message_thread_id: %v", payload["message_thread_id"])
 					}
 				} else {
@@ -134,8 +161,9 @@ func TestSendMessage(t *testing.T) {
 						return nil, fmt.Errorf("message_thread_id should not be set")
 					}
 				}
-				if tt.parseMode != "" {
-					if payload["parse_mode"].(string) != string(tt.parseMode) {
+
+				if tt.opts != nil && tt.opts.ParseMode != "" {
+					if payload["parse_mode"].(string) != string(tt.opts.ParseMode) {
 						return nil, fmt.Errorf("unexpected parse_mode: %v", payload["parse_mode"])
 					}
 				} else {
@@ -152,7 +180,7 @@ func TestSendMessage(t *testing.T) {
 				return resp, nil
 			})
 
-			err := client.SendMessage(tt.chatID, tt.messageThreadID, tt.text, tt.parseMode, tt.disableLinkPreview)
+			err := client.SendMessage(tt.chatID, tt.text, tt.opts)
 			if (err != nil) != tt.expectError {
 				t.Errorf("SendMessage() error = %v, expectError = %v", err, tt.expectError)
 			}
@@ -180,7 +208,7 @@ func TestSendMessageRetriesOn429(t *testing.T) {
 		}, nil
 	})
 
-	if err := client.SendMessage(12345, nil, "Hello Retry", "", false); err != nil {
+	if err := client.SendMessage(12345, "Hello Retry", nil); err != nil {
 		t.Errorf("SendMessage() should succeed after retry, got error: %v", err)
 	}
 	if requests != 2 {

@@ -118,11 +118,9 @@ type WebhookServer struct {
 
 // sendRequest is a queued outgoing Telegram message.
 type sendRequest struct {
-	chatID             int64
-	messageThreadID    *int64
-	text               string
-	parseMode          telegram.ParseMode
-	disableLinkPreview bool
+	chatID int64
+	text   string
+	opts   *telegram.SendMessageOptions
 }
 
 func New() (*WebhookServer, error) {
@@ -156,7 +154,7 @@ func (s *WebhookServer) processSendQueue() {
 		if wait := perChatSendInterval - time.Since(lastSent[req.chatID]); wait > 0 {
 			time.Sleep(wait)
 		}
-		if err := s.api.SendMessage(req.chatID, req.messageThreadID, req.text, req.parseMode, req.disableLinkPreview); err != nil {
+		if err := s.api.SendMessage(req.chatID, req.text, req.opts); err != nil {
 			log.Println("cannot send telegram message:", err)
 		}
 		lastSent[req.chatID] = time.Now()
@@ -198,7 +196,7 @@ func (s *WebhookServer) Start() {
 		if update.Message != nil && update.Message.Text == "/id" {
 			chatID := update.Message.Chat.ID
 			msgText := fmt.Sprintf("Your ChatID is: %d", chatID)
-			if err := s.api.SendMessage(chatID, nil, msgText, "", false); err != nil {
+			if err := s.api.SendMessage(chatID, msgText, nil); err != nil {
 				log.Println("failed to send /id response message:", err)
 			}
 		}
@@ -350,11 +348,13 @@ func (s *WebhookServer) createWebhookHandlers(webhooks []*Webhook) {
 			// slow or rate limited Telegram calls never block webhook responses.
 			select {
 			case s.sendQueue <- sendRequest{
-				chatID:             s.getChatID(wh),
-				messageThreadID:    s.getMessageThreadID(wh),
-				text:               text,
-				parseMode:          wh.ParseMode,
-				disableLinkPreview: s.getDisableLinkPreview(wh),
+				chatID: s.getChatID(wh),
+				text:   text,
+				opts: &telegram.SendMessageOptions{
+					ParseMode:          wh.ParseMode,
+					MessageThreadID:    s.getMessageThreadID(wh),
+					DisableLinkPreview: s.getDisableLinkPreview(wh),
+				},
 			}:
 			default:
 				log.Println("send queue full, dropping telegram message")

@@ -36,6 +36,15 @@ type Chat struct {
 	ID int64 `json:"id"`
 }
 
+// SendMessageOptions contains optional parameters for sending a message.
+type SendMessageOptions struct {
+	ParseMode           ParseMode
+	MessageThreadID     *int64
+	DisableLinkPreview  bool
+	DisableNotification bool
+	ProtectContent      bool
+}
+
 type Client struct {
 	botToken string
 	apiURL   string
@@ -46,7 +55,7 @@ func NewClient(botToken string) *Client {
 	return &Client{
 		botToken: botToken,
 		apiURL:   fmt.Sprintf("https://api.telegram.org/bot%s", botToken),
-		hc:       &http.Client{},
+		hc:       &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
@@ -55,23 +64,31 @@ func CustomClient(baseURL, botToken string) *Client {
 	return &Client{
 		botToken: botToken,
 		apiURL:   baseURL,
-		hc:       &http.Client{},
+		hc:       &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
-func (c *Client) SendMessage(chatID int64, messageThreadID *int64, text string, parseMode ParseMode, disableLinkPreview bool) error {
+func (c *Client) SendMessage(chatID int64, text string, opts *SendMessageOptions) error {
 	payload := map[string]any{
 		"chat_id": chatID,
 		"text":    text,
 	}
-	if messageThreadID != nil {
-		payload["message_thread_id"] = *messageThreadID
-	}
-	if parseMode != "" {
-		payload["parse_mode"] = string(parseMode)
-	}
-	if disableLinkPreview {
-		payload["link_preview_options"] = map[string]any{"is_disabled": true}
+	if opts != nil {
+		if opts.MessageThreadID != nil {
+			payload["message_thread_id"] = *opts.MessageThreadID
+		}
+		if opts.ParseMode != "" {
+			payload["parse_mode"] = string(opts.ParseMode)
+		}
+		if opts.DisableLinkPreview {
+			payload["link_preview_options"] = map[string]any{"is_disabled": true}
+		}
+		if opts.DisableNotification {
+			payload["disable_notification"] = true
+		}
+		if opts.ProtectContent {
+			payload["protect_content"] = true
+		}
 	}
 
 	data, err := json.Marshal(payload)
