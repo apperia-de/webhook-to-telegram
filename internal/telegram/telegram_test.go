@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -180,11 +181,22 @@ func TestSendMessage(t *testing.T) {
 				return resp, nil
 			})
 
-			err := client.SendMessage(tt.chatID, tt.text, tt.opts)
+			err := client.SendMessage(context.Background(), tt.chatID, tt.text, tt.opts)
 			if (err != nil) != tt.expectError {
 				t.Errorf("SendMessage() error = %v, expectError = %v", err, tt.expectError)
 			}
 		})
+	}
+}
+
+func TestSendMessageContextCanceled(t *testing.T) {
+	client := CustomClient("http://mock-telegram", "fake-token")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := client.SendMessage(ctx, 12345, "Hello", nil)
+	if err == nil {
+		t.Error("expected error due to canceled context, got nil")
 	}
 }
 
@@ -208,11 +220,31 @@ func TestSendMessageRetriesOn429(t *testing.T) {
 		}, nil
 	})
 
-	if err := client.SendMessage(12345, "Hello Retry", nil); err != nil {
+	if err := client.SendMessage(context.Background(), 12345, "Hello Retry", nil); err != nil {
 		t.Errorf("SendMessage() should succeed after retry, got error: %v", err)
 	}
 	if requests != 2 {
 		t.Errorf("expected 2 requests (429 then 200), got %d", requests)
+	}
+}
+
+func TestSendMessageRateLimitContextCanceled(t *testing.T) {
+	client := CustomClient("http://mock-telegram", "fake-token")
+
+	client.hc.Transport = roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusTooManyRequests,
+			Body:       io.NopCloser(bytes.NewBufferString(`{"ok": false, "error_code": 429, "description": "Too Many Requests: retry after 10", "parameters": {"retry_after": 10}}`)),
+			Header:     make(http.Header),
+		}, nil
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	err := client.SendMessage(ctx, 12345, "Hello RateLimitCancel", nil)
+	if err == nil {
+		t.Error("expected error due to context timeout during rate limit sleep, got nil")
 	}
 }
 
@@ -283,11 +315,22 @@ func TestSetWebhook(t *testing.T) {
 				return resp, nil
 			})
 
-			err := client.SetWebhook(tt.webhookURL)
+			err := client.SetWebhook(context.Background(), tt.webhookURL)
 			if (err != nil) != tt.expectError {
 				t.Errorf("SetWebhook() error = %v, expectError = %v", err, tt.expectError)
 			}
 		})
+	}
+}
+
+func TestSetWebhookContextCanceled(t *testing.T) {
+	client := CustomClient("http://mock-telegram", "fake-token")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := client.SetWebhook(ctx, "https://example.com/bot")
+	if err == nil {
+		t.Error("expected error due to canceled context, got nil")
 	}
 }
 

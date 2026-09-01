@@ -154,7 +154,7 @@ func (s *WebhookServer) processSendQueue() {
 		if wait := perChatSendInterval - time.Since(lastSent[req.chatID]); wait > 0 {
 			time.Sleep(wait)
 		}
-		if err := s.api.SendMessage(req.chatID, req.text, req.opts); err != nil {
+		if err := s.api.SendMessage(context.Background(), req.chatID, req.text, req.opts); err != nil {
 			log.Println("cannot send telegram message:", err)
 		}
 		lastSent[req.chatID] = time.Now()
@@ -176,7 +176,7 @@ func (s *WebhookServer) Start() {
 	}
 
 	// We should register the webhook URL with Telegram
-	if err := s.api.SetWebhook(s.config.Telegram.WebhookURL); err != nil {
+	if err := s.api.SetWebhook(context.Background(), s.config.Telegram.WebhookURL); err != nil {
 		log.Printf("Warning: failed to set Telegram webhook: %v", err)
 	}
 
@@ -196,7 +196,7 @@ func (s *WebhookServer) Start() {
 		if update.Message != nil && update.Message.Text == "/id" {
 			chatID := update.Message.Chat.ID
 			msgText := fmt.Sprintf("Your ChatID is: %d", chatID)
-			if err := s.api.SendMessage(chatID, msgText, nil); err != nil {
+			if err := s.api.SendMessage(r.Context(), chatID, msgText, nil); err != nil {
 				log.Println("failed to send /id response message:", err)
 			}
 		}

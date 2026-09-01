@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -68,7 +69,7 @@ func CustomClient(baseURL, botToken string) *Client {
 	}
 }
 
-func (c *Client) SendMessage(chatID int64, text string, opts *SendMessageOptions) error {
+func (c *Client) SendMessage(ctx context.Context, chatID int64, text string, opts *SendMessageOptions) error {
 	payload := map[string]any{
 		"chat_id": chatID,
 		"text":    text,
@@ -97,7 +98,13 @@ func (c *Client) SendMessage(chatID int64, text string, opts *SendMessageOptions
 	}
 
 	for attempt := 1; ; attempt++ {
-		resp, err := c.hc.Post(c.apiURL+"/sendMessage", "application/json", bytes.NewReader(data))
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.apiURL+"/sendMessage", bytes.NewReader(data))
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := c.hc.Do(req)
 		if err != nil {
 			return err
 		}
@@ -110,7 +117,13 @@ func (c *Client) SendMessage(chatID int64, text string, opts *SendMessageOptions
 
 		// Rate limited: wait for the duration Telegram tells us and try again.
 		if resp.StatusCode == http.StatusTooManyRequests && attempt < maxSendAttempts {
-			time.Sleep(retryAfter(body))
+			timer := time.NewTimer(retryAfter(body))
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return ctx.Err()
+			case <-timer.C:
+			}
 			continue
 		}
 
@@ -132,7 +145,7 @@ func retryAfter(body []byte) time.Duration {
 	return time.Second
 }
 
-func (c *Client) SetWebhook(webhookURL string) error {
+func (c *Client) SetWebhook(ctx context.Context, webhookURL string) error {
 	payload := map[string]any{
 		"url": webhookURL,
 	}
@@ -142,7 +155,13 @@ func (c *Client) SetWebhook(webhookURL string) error {
 		return err
 	}
 
-	resp, err := c.hc.Post(c.apiURL+"/setWebhook", "application/json", bytes.NewBuffer(data))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.apiURL+"/setWebhook", bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.hc.Do(req)
 	if err != nil {
 		return err
 	}
@@ -155,3 +174,4 @@ func (c *Client) SetWebhook(webhookURL string) error {
 
 	return nil
 }
+
