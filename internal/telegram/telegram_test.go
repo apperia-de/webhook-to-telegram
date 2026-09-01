@@ -19,14 +19,15 @@ func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 func TestSendMessage(t *testing.T) {
 	threadID := int64(454)
 	tests := []struct {
-		name            string
-		chatID          int64
-		messageThreadID *int64
-		text            string
-		parseMode       ParseMode
-		mockStatus      int
-		mockBody        string
-		expectError     bool
+		name               string
+		chatID             int64
+		messageThreadID    *int64
+		disableLinkPreview bool
+		text               string
+		parseMode          ParseMode
+		mockStatus         int
+		mockBody           string
+		expectError        bool
 	}{
 		{
 			name:        "Success with HTML",
@@ -36,6 +37,16 @@ func TestSendMessage(t *testing.T) {
 			mockStatus:  http.StatusOK,
 			mockBody:    `{"ok": true}`,
 			expectError: false,
+		},
+		{
+			name:               "Success with DisableLinkPreview",
+			chatID:             12345,
+			disableLinkPreview: true,
+			text:               "Hello NoPreview",
+			parseMode:          HTML,
+			mockStatus:         http.StatusOK,
+			mockBody:           `{"ok": true}`,
+			expectError:        false,
 		},
 		{
 			name:            "Success with MessageThreadID",
@@ -104,6 +115,16 @@ func TestSendMessage(t *testing.T) {
 				if payload["text"].(string) != tt.text {
 					return nil, fmt.Errorf("unexpected text: %s", payload["text"])
 				}
+				if tt.disableLinkPreview {
+					opts, ok := payload["link_preview_options"].(map[string]any)
+					if !ok || opts["is_disabled"] != true {
+						return nil, fmt.Errorf("unexpected link_preview_options: %v", payload["link_preview_options"])
+					}
+				} else {
+					if _, ok := payload["link_preview_options"]; ok {
+						return nil, fmt.Errorf("link_preview_options should not be set")
+					}
+				}
 				if tt.messageThreadID != nil {
 					if int64(payload["message_thread_id"].(float64)) != *tt.messageThreadID {
 						return nil, fmt.Errorf("unexpected message_thread_id: %v", payload["message_thread_id"])
@@ -131,7 +152,7 @@ func TestSendMessage(t *testing.T) {
 				return resp, nil
 			})
 
-			err := client.SendMessage(tt.chatID, tt.messageThreadID, tt.text, tt.parseMode)
+			err := client.SendMessage(tt.chatID, tt.messageThreadID, tt.text, tt.parseMode, tt.disableLinkPreview)
 			if (err != nil) != tt.expectError {
 				t.Errorf("SendMessage() error = %v, expectError = %v", err, tt.expectError)
 			}
@@ -159,7 +180,7 @@ func TestSendMessageRetriesOn429(t *testing.T) {
 		}, nil
 	})
 
-	if err := client.SendMessage(12345, nil, "Hello Retry", ""); err != nil {
+	if err := client.SendMessage(12345, nil, "Hello Retry", "", false); err != nil {
 		t.Errorf("SendMessage() should succeed after retry, got error: %v", err)
 	}
 	if requests != 2 {

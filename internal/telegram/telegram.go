@@ -59,7 +59,7 @@ func CustomClient(baseURL, botToken string) *Client {
 	}
 }
 
-func (c *Client) SendMessage(chatID int64, messageThreadID *int64, text string, parseMode ParseMode) error {
+func (c *Client) SendMessage(chatID int64, messageThreadID *int64, text string, parseMode ParseMode, disableLinkPreview bool) error {
 	payload := map[string]any{
 		"chat_id": chatID,
 		"text":    text,
@@ -69,6 +69,9 @@ func (c *Client) SendMessage(chatID int64, messageThreadID *int64, text string, 
 	}
 	if parseMode != "" {
 		payload["parse_mode"] = string(parseMode)
+	}
+	if disableLinkPreview {
+		payload["link_preview_options"] = map[string]any{"is_disabled": true}
 	}
 
 	data, err := json.Marshal(payload)

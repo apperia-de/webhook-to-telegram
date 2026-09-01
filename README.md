@@ -46,6 +46,7 @@ Configure multiple incoming webhooks with custom verification methods (No valida
 telegram:
   chatID: 987654321                         # Default Chat ID to receive messages
   # messageThreadID: 123                    # Optional: default topic/thread ID for forum groups
+  # disableLinkPreview: true                # Optional: disable link previews in messages
   botToken: "123456789:ABCdefGhIJKlmNoPQ"   # Your Telegram Bot Token
   webhookURL: "https://yourdomain.com/telegram-webhook"
 
@@ -126,6 +127,7 @@ The `config.yml` file is structured into two main components: `telegram` (global
 | `botToken` | String | Yes | Your Telegram Bot token obtained from [@BotFather](https://t.me/botfather). |
 | `chatID` | Integer | Yes | Default Telegram Chat or Group ID to send messages to. |
 | `messageThreadID` | Integer | No | Default topic/thread ID for messages sent to forum groups (Telegram `message_thread_id`). |
+| `disableLinkPreview` | Boolean | No | Disable link previews for all outgoing messages (`link_preview_options.is_disabled`). Defaults to `false`. |
 | `webhookURL` | String | Yes | Your server's public Telegram webhook endpoint URL (e.g. `https://yourdomain.com/telegram-webhook`). |
 
 ---
@@ -143,6 +145,7 @@ Define a list of incoming endpoints. Each entry supports the following fields:
 | `parseMode` | String | `none` | Markdown/HTML formatting mode: `html`, `markdown`, or `markdownv2` (case-insensitive). |
 | `telegramChatID`| Integer | *(global chatID)* | Override the global chat ID to send these specific events to a different chat/group. |
 | `telegramMessageThreadID`| Integer | *(global messageThreadID)* | Override the global topic/thread ID to send these specific events to a different forum topic. |
+| `telegramDisableLinkPreview`| Boolean | *(global disableLinkPreview)* | Override the global link preview setting for these specific events. |
 | `verification` | Object | `none` | Security authentication parameters (see below). |
 | `templates` | Array | | Formatting and routing rules for generating the Telegram alerts. |
 
