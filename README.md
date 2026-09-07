@@ -139,7 +139,7 @@ Define a list of incoming endpoints. Each entry supports the following fields:
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `name` | String | | A descriptive label for this webhook (e.g., `GitHub Stars`). |
-| `pattern` | String | | The URL route path suffix. Handled under `/webhooks/<pattern>`. |
+| `pattern` | String | | The URL route path suffix. Handled under `/webhooks/<pattern>` (or directly if starting with `/`, e.g. `/<pattern>`). |
 | `contentType` | String | `application/json` | Expected HTTP content type: `application/json` or `application/x-www-form-urlencoded`. |
 | `formKey` | String | `payload` | *(For URL-encoded requests)* The form parameter key containing the JSON string. |
 | `parseMode` | String | `none` | Markdown/HTML formatting mode: `html`, `markdown`, or `markdownv2` (case-insensitive). |

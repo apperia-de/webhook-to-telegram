@@ -166,14 +166,17 @@ func (s *WebhookServer) GetHttpServer() *http.Server {
 }
 
 func (s *WebhookServer) Start() {
+	normURL, err := normalizeWebhookURL(s.config.Telegram.WebhookURL)
+	if err != nil {
+		log.Fatalf("invalid webhook URL: %v", err)
+	}
+	s.config.Telegram.WebhookURL = normURL
+
 	u, err := url.Parse(s.config.Telegram.WebhookURL)
 	if err != nil {
 		log.Fatalf("invalid webhook URL: %v", err)
 	}
 	path := u.Path
-	if path == "" || path == "/" {
-		path = "/telegram-webhook"
-	}
 
 	// We should register the webhook URL with Telegram
 	if err := s.api.SetWebhook(context.Background(), s.config.Telegram.WebhookURL); err != nil {
@@ -225,6 +228,12 @@ func (s *WebhookServer) initialize() error {
 		return fmt.Errorf("required telegram chatID is missing")
 	}
 
+	normURL, err := normalizeWebhookURL(s.config.Telegram.WebhookURL)
+	if err != nil {
+		return fmt.Errorf("invalid webhook URL %q: %w", s.config.Telegram.WebhookURL, err)
+	}
+	s.config.Telegram.WebhookURL = normURL
+
 	s.api = telegram.NewClient(s.config.Telegram.BotToken)
 
 	for _, wh := range s.config.Webhooks {
@@ -247,7 +256,6 @@ func (s *WebhookServer) initialize() error {
 
 func (s *WebhookServer) createWebhookHandlers(webhooks []*Webhook) {
 	for _, wh := range webhooks {
-		log.Println("Creating Webhook", wh.Name)
 		wh := wh
 		handleWebhook := func(w http.ResponseWriter, r *http.Request) {
 			var (
@@ -365,7 +373,9 @@ func (s *WebhookServer) createWebhookHandlers(webhooks []*Webhook) {
 			w.WriteHeader(http.StatusOK)
 		}
 
-		s.mux.HandleFunc(fmt.Sprintf("/webhooks/%s", wh.Pattern), handleWebhook)
+		route := webhookRoute(wh.Pattern)
+		log.Printf("Creating Webhook %s at %s", wh.Name, route)
+		s.mux.HandleFunc(route, handleWebhook)
 	}
 }
 
@@ -557,3 +567,32 @@ func (s *WebhookServer) escapeText(parseMode telegram.ParseMode, text string) st
 		return ""
 	}
 }
+
+// normalizeWebhookURL ensures the Telegram webhook URL has a valid non-empty path
+// and ends with a trailing slash to prevent Telegram API errors or redirect issues.
+func normalizeWebhookURL(rawURL string) (string, error) {
+	if rawURL == "" {
+		return "", nil
+	}
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return "", err
+	}
+	if u.Path == "" || u.Path == "/" {
+		u.Path = "/telegram-webhook/"
+	} else if !strings.HasSuffix(u.Path, "/") {
+		u.Path += "/"
+	}
+	return u.String(), nil
+}
+
+// webhookRoute resolves the HTTP path for a webhook.
+// Patterns starting with "/" are used as-is, while relative patterns
+// are prefixed with "/webhooks/".
+func webhookRoute(pattern string) string {
+	if strings.HasPrefix(pattern, "/") {
+		return pattern
+	}
+	return fmt.Sprintf("/webhooks/%s", pattern)
+}
+

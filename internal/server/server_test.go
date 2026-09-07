@@ -657,3 +657,151 @@ webhooks:
 		t.Error("expected Telegram API call, but none was received")
 	}
 }
+
+func TestNormalizeWebhookURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+		wantErr  bool
+	}{
+		{
+			name:     "empty URL",
+			input:    "",
+			expected: "",
+			wantErr:  false,
+		},
+		{
+			name:     "domain without trailing slash",
+			input:    "https://telegram.example.com",
+			expected: "https://telegram.example.com/telegram-webhook/",
+			wantErr:  false,
+		},
+		{
+			name:     "domain with trailing slash",
+			input:    "https://telegram.example.com/",
+			expected: "https://telegram.example.com/telegram-webhook/",
+			wantErr:  false,
+		},
+		{
+			name:     "subpath without trailing slash",
+			input:    "https://telegram.example.com/webhooks",
+			expected: "https://telegram.example.com/webhooks/",
+			wantErr:  false,
+		},
+		{
+			name:     "subpath with trailing slash",
+			input:    "https://telegram.example.com/webhooks/",
+			expected: "https://telegram.example.com/webhooks/",
+			wantErr:  false,
+		},
+		{
+			name:     "custom telegram path without trailing slash",
+			input:    "https://telegram.example.com/telegram-webhook",
+			expected: "https://telegram.example.com/telegram-webhook/",
+			wantErr:  false,
+		},
+		{
+			name:     "invalid URL",
+			input:    "://bad-url",
+			expected: "",
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := normalizeWebhookURL(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("normalizeWebhookURL(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+			}
+			if got != tt.expected {
+				t.Errorf("normalizeWebhookURL(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestWebhookRoute(t *testing.T) {
+	tests := []struct {
+		name     string
+		pattern  string
+		expected string
+	}{
+		{
+			name:     "relative pattern",
+			pattern:  "ko-fi",
+			expected: "/webhooks/ko-fi",
+		},
+		{
+			name:     "nested relative pattern",
+			pattern:  "github/stars",
+			expected: "/webhooks/github/stars",
+		},
+		{
+			name:     "absolute pattern",
+			pattern:  "/custom/hook",
+			expected: "/custom/hook",
+		},
+		{
+			name:     "root pattern",
+			pattern:  "/",
+			expected: "/",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := webhookRoute(tt.pattern)
+			if got != tt.expected {
+				t.Errorf("webhookRoute(%q) = %q, want %q", tt.pattern, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestWebhookHandlerAbsolutePattern(t *testing.T) {
+	cfgContent := `
+telegram:
+  botToken: "fake-token"
+  chatID: 987654
+  webhookURL: "https://example.com/webhooks"
+webhooks:
+  - name: custom-route-webhook
+    pattern: /api/v1/custom-hook
+    contentType: application/json
+    verification:
+      type: none
+    templates:
+      - template: "Received: %s"
+        keys:
+          - message
+`
+	err := os.WriteFile(ConfigFile, []byte(cfgContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+	defer func() { _ = os.Remove(ConfigFile) }()
+
+	s, err := New()
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	// Verify webhookURL normalization during initialize
+	if s.config.Telegram.WebhookURL != "https://example.com/webhooks/" {
+		t.Errorf("expected normalized webhookURL 'https://example.com/webhooks/', got %q", s.config.Telegram.WebhookURL)
+	}
+
+	recorder := httptest.NewRecorder()
+	payload := `{"message": "hello custom"}`
+	req := httptest.NewRequest("POST", "/api/v1/custom-hook", bytes.NewBufferString(payload))
+	req.Header.Set("Content-Type", "application/json")
+
+	s.mux.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d. Body: %s", recorder.Code, recorder.Body.String())
+	}
+}
+

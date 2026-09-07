@@ -3,11 +3,11 @@ telegram:
   #messageThreadID: %YOUR_TELEGRAM_MESSAGE_THREAD_ID% # Optional: default topic/thread ID for forum groups.
   #disableLinkPreview: true # Optional: disable link previews for all outgoing messages.
   botToken: %YOUR_TELEGRAM_BOT_TOKEN%
-  webhookURL: https://%YOUR_OWN_TELEGRAM_BOT_DOMAIN%"
+  webhookURL: https://%YOUR_OWN_TELEGRAM_BOT_DOMAIN%/telegram-webhook/
 
 webhooks:
   - name: ko-fi.com
-    pattern: ko-fi # Will be added to your domain as /webhooks/ko-fi as the WebhookURL -> https://%YOUR_OWN_TELEGRAM_BOT_DOMAIN%/webhooks/ko-fi
+    pattern: ko-fi # Relative patterns are served at /webhooks/<pattern> -> https://%YOUR_OWN_TELEGRAM_BOT_DOMAIN%/webhooks/ko-fi (or use a leading slash like '/ko-fi' for exact paths)
     contentType: application/x-www-form-urlencoded # Can be either "application/x-www-form-urlencoded" or "application/json"
     formKey: data # Name of the form field which contains the json data -> Required only for contentType: application/x-www-form-urlencoded
     verification: # Here we validate the message and compare the key "verification_token" against the value we defined at ko-fi.com
